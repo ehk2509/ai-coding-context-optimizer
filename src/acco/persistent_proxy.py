@@ -14,8 +14,10 @@ import socket
 import subprocess
 import sys
 import tempfile
+import time
 from typing import Any, Callable
 from urllib.parse import urlparse
+from urllib.request import urlopen
 from xml.sax.saxutils import escape
 
 from .config import update_json
@@ -437,13 +439,36 @@ def uninstall_service(
         )
 
 
-def proxy_alive(profile: PersistentProxyProfile, timeout: float = 0.2) -> bool:
-    """Return whether the profile's stable loopback listener accepts connections."""
+def proxy_alive(profile: PersistentProxyProfile, timeout: float = 0.4) -> bool:
+    """Return whether the expected ACCO instance owns the stable listener."""
+    url = f"http://127.0.0.1:{profile.port}/__acco/health"
     try:
-        with socket.create_connection(("127.0.0.1", profile.port), timeout=timeout):
-            return True
-    except OSError:
+        with urlopen(url, timeout=timeout) as response:
+            payload = json.loads(response.read())
+    except (OSError, ValueError):
         return False
+    expected_root = hashlib.sha256(profile.root.encode()).hexdigest()[:16]
+    return (
+        isinstance(payload, dict)
+        and payload.get("ok") is True
+        and payload.get("provider") == profile.provider
+        and payload.get("instance_id") == profile.profile_id
+        and payload.get("root_fingerprint") == expected_root
+    )
+
+
+def _wait_profile_ready(
+    profile: PersistentProxyProfile,
+    *,
+    timeout_seconds: float = 6.0,
+) -> bool:
+    """Wait briefly for a just-installed native service to own its listener."""
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        if proxy_alive(profile):
+            return True
+        time.sleep(0.1)
+    return False
 
 
 def _read_json_object(path: Path) -> dict[str, Any]:
@@ -469,11 +494,10 @@ def attach_claude(profile: PersistentProxyProfile) -> None:
     env_map = dict(env) if isinstance(env, dict) else {}
     current = str(env_map.get("ANTHROPIC_BASE_URL", "")).strip()
     owner = str(env_map.get(CLAUDE_PROFILE_ENV, "")).strip()
-    allowed = {"", profile.upstream, profile.local_base_url}
-    if current not in allowed and owner != profile.profile_id:
+    if current and owner != profile.profile_id:
         raise ValueError(
             "refusing to replace user-managed Claude ANTHROPIC_BASE_URL; "
-            "remove it or install ACCO against that same upstream explicitly"
+            "remove that override before enabling persistent ACCO routing"
         )
 
     def mutate(payload: dict) -> dict:
@@ -682,8 +706,8 @@ def install_persistent_profiles(
     for host in requested:
         provider_hosts.setdefault(DURABLE_HOST_PROVIDER[host], []).append(host)
 
-    installed: list[PersistentProxyProfile] = []
-    attached: list[str] = []
+    installed: list[tuple[PersistentProxyProfile, PersistentProxyProfile | None]] = []
+    attached: list[tuple[str, str]] = []
     try:
         for provider, provider_host_names in sorted(provider_hosts.items()):
             profile_id = _profile_id(root, provider)
@@ -717,6 +741,7 @@ def install_persistent_profiles(
                 service_artifact=artifact,
             )
             _save_profile(profile)
+            installed.append((profile, previous))
             service_kind, service_artifact = install_service(
                 profile_id,
                 kind=selected_kind,
@@ -725,29 +750,51 @@ def install_persistent_profiles(
             )
             if service_kind != profile.service_kind or service_artifact != profile.service_artifact:
                 raise RuntimeError("persistent proxy supervisor artifact mismatch")
-            installed.append(profile)
+            if not _wait_profile_ready(profile):
+                raise RuntimeError(
+                    f"persistent {provider} proxy did not become ready on "
+                    f"127.0.0.1:{profile.port}"
+                )
             for host in provider_host_names:
                 attach_host(host, profile, home=home)
-                attached.append(host)
+                attached.append((profile.profile_id, host))
     except BaseException:
-        for profile in reversed(installed):
-            for host in profile.hosts:
-                if host in attached:
-                    try:
-                        detach_host(host, profile, home=home)
-                    except (OSError, ValueError):
-                        pass
+        for profile, previous in reversed(installed):
+            if previous is None:
+                for host in profile.hosts:
+                    if (profile.profile_id, host) in attached:
+                        try:
+                            detach_host(host, profile, home=home)
+                        except (OSError, ValueError):
+                            pass
+                try:
+                    uninstall_service(profile, runner=runner)
+                except (OSError, subprocess.SubprocessError):
+                    pass
+                _profile_path(profile.profile_id).unlink(missing_ok=True)
+                continue
+
+            _save_profile(previous)
             try:
-                uninstall_service(profile, runner=runner)
-            except (OSError, subprocess.SubprocessError):
+                install_service(
+                    previous.profile_id,
+                    kind=previous.service_kind,
+                    home=home,
+                    runner=runner,
+                )
+            except (OSError, subprocess.SubprocessError, ValueError):
                 pass
-            _profile_path(profile.profile_id).unlink(missing_ok=True)
+            for host in previous.hosts:
+                try:
+                    attach_host(host, previous, home=home)
+                except (OSError, ValueError):
+                    pass
         raise
 
     return {
         "root": str(root),
         "hosts": list(requested),
-        "profiles": [profile.to_dict() for profile in installed],
+        "profiles": [profile.to_dict() for profile, _previous in installed],
     }
 
 
@@ -798,6 +845,7 @@ def run_profile(profile_id: str) -> int:
             provider=profile.provider,
             bind="127.0.0.1",
             port=profile.port,
+            instance_id=profile.profile_id,
         )
     )
     return 0
