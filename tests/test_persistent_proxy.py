@@ -1,0 +1,300 @@
+"""Tests for persistent background provider proxy installation."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+import subprocess
+
+import pytest
+
+from acco import persistent_proxy
+from acco.persistent_proxy import (
+    PersistentProxyProfile,
+    attach_claude,
+    attach_codex,
+    detach_claude,
+    detach_codex,
+    install_persistent_profiles,
+    profiles_for_root,
+    render_service_artifact,
+    uninstall_persistent_profiles,
+)
+
+
+def _ok_runner(calls):
+    def run(argv, **kwargs):
+        calls.append((list(argv), dict(kwargs)))
+        return subprocess.CompletedProcess(argv, 0, "", "")
+    return run
+
+
+def _profile(root: Path, provider: str, port: int, host: str) -> PersistentProxyProfile:
+    profile_id = persistent_proxy._profile_id(root, provider)
+    return PersistentProxyProfile(
+        profile_id=profile_id,
+        root=str(root.resolve()),
+        provider=provider,
+        upstream=persistent_proxy.PROVIDERS[provider].upstream,
+        port=port,
+        hosts=(host,),
+        service_kind="systemd-user",
+        service_artifact=str(
+            root / f"acco-proxy-{profile_id}.service"
+        ),
+    )
+
+
+def test_service_artifacts_are_user_scoped_and_credential_free(tmp_path, monkeypatch):
+    """Native service definitions should store only profile identity and executable."""
+    monkeypatch.setattr(
+        persistent_proxy,
+        "_resolve_acco_command",
+        lambda: ["/opt/acco/bin/acco"],
+    )
+
+    linux_path, linux = render_service_artifact(
+        "abc123",
+        kind="systemd-user",
+        home=tmp_path,
+    )
+    assert linux_path == tmp_path / ".config/systemd/user/acco-proxy-abc123.service"
+    assert "ExecStart=/opt/acco/bin/acco proxy-run abc123" in linux
+    assert "API_KEY" not in linux
+
+    mac_path, plist = render_service_artifact(
+        "abc123",
+        kind="launchd-user",
+        home=tmp_path,
+    )
+    assert mac_path == tmp_path / "Library/LaunchAgents/com.acco.proxy.abc123.plist"
+    assert "<string>proxy-run</string><string>abc123</string>" in plist
+    assert "API_KEY" not in plist
+
+    windows_path, windows = render_service_artifact(
+        "abc123",
+        kind="windows-task",
+        home=tmp_path,
+    )
+    assert windows is None
+    assert windows_path.name == "abc123.json"
+
+
+def test_claude_attachment_is_owned_reversible_and_preserves_other_settings(tmp_path):
+    """Claude attachment should mutate only ACCO-owned env keys."""
+    root = tmp_path / "repo"
+    root.mkdir()
+    settings = root / ".claude" / "settings.json"
+    settings.parent.mkdir()
+    settings.write_text(
+        json.dumps(
+            {
+                "env": {"OTHER": "keep"},
+                "permissions": {"allow": ["Read"]},
+            }
+        ),
+        encoding="utf-8",
+    )
+    profile = _profile(root, "anthropic", 19021, "claude")
+
+    attach_claude(profile)
+    payload = json.loads(settings.read_text(encoding="utf-8"))
+    assert payload["env"]["ANTHROPIC_BASE_URL"] == "http://127.0.0.1:19021"
+    assert payload["env"]["ACCO_PERSISTENT_PROXY_PROFILE"] == profile.profile_id
+    assert payload["env"]["OTHER"] == "keep"
+    assert payload["permissions"] == {"allow": ["Read"]}
+
+    detach_claude(profile)
+    payload = json.loads(settings.read_text(encoding="utf-8"))
+    assert payload["env"] == {"OTHER": "keep"}
+    assert payload["permissions"] == {"allow": ["Read"]}
+
+
+def test_claude_attachment_refuses_user_base_url(tmp_path):
+    """Persistent install must not silently replace a user's gateway."""
+    root = tmp_path / "repo"
+    root.mkdir()
+    settings = root / ".claude" / "settings.json"
+    settings.parent.mkdir()
+    settings.write_text(
+        json.dumps({"env": {"ANTHROPIC_BASE_URL": "https://gateway.example"}}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="user-managed Claude"):
+        attach_claude(_profile(root, "anthropic", 19022, "claude"))
+
+    payload = json.loads(settings.read_text(encoding="utf-8"))
+    assert payload["env"]["ANTHROPIC_BASE_URL"] == "https://gateway.example"
+
+
+def test_codex_attachment_preserves_unrelated_toml_and_oauth_mode(tmp_path):
+    """Codex routing should be marker-owned and retain unrelated config."""
+    root = tmp_path / "repo"
+    home = tmp_path / "home"
+    root.mkdir()
+    codex_dir = home / ".codex"
+    codex_dir.mkdir(parents=True)
+    config = codex_dir / "config.toml"
+    config.write_text(
+        'model = "gpt-5.6-sol"\n\n[features]\nweb_search = true\n',
+        encoding="utf-8",
+    )
+    (codex_dir / "auth.json").write_text(
+        json.dumps({"auth_mode": "chatgpt"}),
+        encoding="utf-8",
+    )
+    profile = _profile(root, "openai", 19023, "codex")
+
+    attach_codex(profile, home=home)
+    first = config.read_text(encoding="utf-8")
+    attach_codex(profile, home=home)
+    second = config.read_text(encoding="utf-8")
+
+    assert first == second
+    assert 'model = "gpt-5.6-sol"' in second
+    assert "[features]" in second
+    assert "web_search = true" in second
+    assert second.count("[model_providers.acco]") == 1
+    assert f'base_url = "http://127.0.0.1:19023/v1"' in second
+    assert "requires_openai_auth = true" in second
+
+    detach_codex(profile, home=home)
+    cleaned = config.read_text(encoding="utf-8")
+    assert "ACCO persistent proxy" not in cleaned
+    assert "[model_providers.acco]" not in cleaned
+    assert 'model = "gpt-5.6-sol"' in cleaned
+    assert "[features]" in cleaned
+
+
+def test_codex_attachment_refuses_existing_root_routing(tmp_path):
+    """ACCO must not take over a user's active Codex provider selection."""
+    root = tmp_path / "repo"
+    home = tmp_path / "home"
+    root.mkdir()
+    config = home / ".codex" / "config.toml"
+    config.parent.mkdir(parents=True)
+    config.write_text(
+        'model_provider = "company"\n\n[model_providers.company]\n'
+        'base_url = "https://gateway.example/v1"\n',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="user-managed Codex root routing"):
+        attach_codex(_profile(root, "openai", 19024, "codex"), home=home)
+
+    assert 'model_provider = "company"' in config.read_text(encoding="utf-8")
+
+
+def test_install_two_provider_profiles_and_uninstall_transactionally(
+    tmp_path,
+    monkeypatch,
+):
+    """Claude and Codex should get separate stable provider listeners."""
+    root = tmp_path / "repo"
+    home = tmp_path / "home"
+    state = tmp_path / "state"
+    root.mkdir()
+    monkeypatch.setenv("ACCO_STATE_DIR", str(state))
+    monkeypatch.setattr(persistent_proxy, "_wait_profile_ready", lambda _profile: True)
+    monkeypatch.setattr(
+        persistent_proxy,
+        "_resolve_acco_command",
+        lambda: ["/opt/acco/bin/acco"],
+    )
+    calls = []
+    runner = _ok_runner(calls)
+
+    result = install_persistent_profiles(
+        root,
+        ("claude", "codex"),
+        ports={"anthropic": 19025, "openai": 19026},
+        kind="systemd-user",
+        home=home,
+        runner=runner,
+    )
+
+    assert result["hosts"] == ["claude", "codex"]
+    profiles = profiles_for_root(root)
+    assert {item.provider for item in profiles} == {"anthropic", "openai"}
+    assert {item.port for item in profiles} == {19025, 19026}
+    settings = json.loads(
+        (root / ".claude" / "settings.json").read_text(encoding="utf-8")
+    )
+    assert settings["env"]["ANTHROPIC_BASE_URL"] == "http://127.0.0.1:19025"
+    codex = (home / ".codex" / "config.toml").read_text(encoding="utf-8")
+    assert 'base_url = "http://127.0.0.1:19026/v1"' in codex
+
+    service_calls = [argv for argv, _kwargs in calls]
+    assert ["systemctl", "--user", "daemon-reload"] in service_calls
+    assert sum(
+        1
+        for argv in service_calls
+        if argv[:4] == ["systemctl", "--user", "enable", "--now"]
+    ) == 2
+
+    removed = uninstall_persistent_profiles(
+        root,
+        home=home,
+        runner=runner,
+    )
+    assert len(removed["removed_profiles"]) == 2
+    assert profiles_for_root(root) == ()
+    settings = json.loads(
+        (root / ".claude" / "settings.json").read_text(encoding="utf-8")
+    )
+    assert "ANTHROPIC_BASE_URL" not in settings.get("env", {})
+    assert "[model_providers.acco]" not in (
+        home / ".codex" / "config.toml"
+    ).read_text(encoding="utf-8")
+
+
+def test_install_rolls_back_first_provider_when_second_service_fails(
+    tmp_path,
+    monkeypatch,
+):
+    """Partial multi-provider installation must not strand host routing."""
+    root = tmp_path / "repo"
+    home = tmp_path / "home"
+    state = tmp_path / "state"
+    root.mkdir()
+    monkeypatch.setenv("ACCO_STATE_DIR", str(state))
+    monkeypatch.setattr(persistent_proxy, "_wait_profile_ready", lambda _profile: True)
+    monkeypatch.setattr(
+        persistent_proxy,
+        "_resolve_acco_command",
+        lambda: ["/opt/acco/bin/acco"],
+    )
+    enable_count = 0
+
+    def runner(argv, **kwargs):
+        nonlocal enable_count
+        if argv[:4] == ["systemctl", "--user", "enable", "--now"]:
+            enable_count += 1
+            if enable_count == 2:
+                raise subprocess.CalledProcessError(
+                    1,
+                    argv,
+                    stderr="synthetic second-provider failure",
+                )
+        return subprocess.CompletedProcess(argv, 0, "", "")
+
+    with pytest.raises(subprocess.CalledProcessError):
+        install_persistent_profiles(
+            root,
+            ("claude", "codex"),
+            ports={"anthropic": 19027, "openai": 19028},
+            kind="systemd-user",
+            home=home,
+            runner=runner,
+        )
+
+    assert profiles_for_root(root) == ()
+    settings_path = root / ".claude" / "settings.json"
+    if settings_path.exists():
+        settings = json.loads(settings_path.read_text(encoding="utf-8"))
+        assert "ANTHROPIC_BASE_URL" not in settings.get("env", {})
+    codex = home / ".codex" / "config.toml"
+    assert not codex.exists() or "[model_providers.acco]" not in codex.read_text(
+        encoding="utf-8"
+    )
