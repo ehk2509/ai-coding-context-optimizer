@@ -56,6 +56,11 @@ def test_service_artifacts_are_user_scoped_and_credential_free(tmp_path, monkeyp
         "_resolve_acco_command",
         lambda: ["/opt/acco/bin/acco"],
     )
+    monkeypatch.setattr(
+        persistent_proxy,
+        "state_dir",
+        lambda: tmp_path / "state",
+    )
 
     linux_path, linux = render_service_artifact(
         "abc123",
@@ -63,7 +68,10 @@ def test_service_artifacts_are_user_scoped_and_credential_free(tmp_path, monkeyp
         home=tmp_path,
     )
     assert linux_path == tmp_path / ".config/systemd/user/acco-proxy-abc123.service"
-    assert "ExecStart=/opt/acco/bin/acco proxy-run abc123" in linux
+    assert (
+        "ExecStart=/opt/acco/bin/acco proxy-run abc123 --state-dir "
+        + str(tmp_path / "state")
+    ) in linux
     assert "API_KEY" not in linux
 
     mac_path, plist = render_service_artifact(
@@ -73,6 +81,8 @@ def test_service_artifacts_are_user_scoped_and_credential_free(tmp_path, monkeyp
     )
     assert mac_path == tmp_path / "Library/LaunchAgents/com.acco.proxy.abc123.plist"
     assert "<string>proxy-run</string><string>abc123</string>" in plist
+    assert "<string>--state-dir</string>" in plist
+    assert f"<string>{tmp_path / 'state'}</string>" in plist
     assert "API_KEY" not in plist
 
     windows_path, windows = render_service_artifact(
