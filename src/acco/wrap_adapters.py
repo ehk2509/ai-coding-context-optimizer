@@ -377,7 +377,7 @@ def prepare_openclaw_env(
             json.dumps(overlay, indent=2, ensure_ascii=False) + "\n",
             encoding="utf-8",
         )
-    except BaseException:
+    except (OSError, TypeError, ValueError):
         temp_path.unlink(missing_ok=True)
         raise
 
