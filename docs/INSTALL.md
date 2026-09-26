@@ -166,7 +166,7 @@ acco proxy install . --host claude --host codex
 acco proxy status .
 ```
 
-Linux uses a `systemd --user` service, macOS uses a user LaunchAgent, and Windows uses a current-user logon task. Persistent profile/service files contain no API keys; client authentication continues to flow in the provider request itself. Host routing is changed only after ACCO verifies the expected local proxy instance is actually listening.
+Linux uses a `systemd --user` service, macOS uses a user LaunchAgent, and Windows uses a current-user logon task. Persistent profile/service files contain no API keys; native service metadata contains only runtime paths/ids needed to find the credential-free profile, and client authentication continues to flow in the provider request itself. Host routing is changed only after ACCO verifies the expected local proxy instance is actually listening.
 
 Remove the durable routing and autostart services with:
 
