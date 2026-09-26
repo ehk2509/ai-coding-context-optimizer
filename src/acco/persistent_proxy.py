@@ -143,11 +143,31 @@ def _validate_upstream(provider: str, upstream: str) -> str:
     return value
 
 
-def _free_port() -> int:
-    """Choose one currently free loopback port for a new persistent profile."""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as handle:
-        handle.bind(("127.0.0.1", 0))
-        return int(handle.getsockname()[1])
+def _reserved_profile_ports() -> dict[int, str]:
+    """Return stable ports owned by any readable persisted profile."""
+    reserved: dict[int, str] = {}
+    directory = _profiles_root()
+    if not directory.exists():
+        return reserved
+    for path in directory.glob("*.json"):
+        try:
+            profile = load_profile(path.stem)
+        except ValueError:
+            continue
+        reserved[profile.port] = profile.profile_id
+    return reserved
+
+
+def _free_port(*, excluded: set[int] | None = None) -> int:
+    """Choose one free loopback port not reserved by a stopped profile."""
+    blocked = excluded or set()
+    for _attempt in range(32):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as handle:
+            handle.bind(("127.0.0.1", 0))
+            port = int(handle.getsockname()[1])
+        if port not in blocked:
+            return port
+    raise RuntimeError("could not allocate an unreserved persistent proxy port")
 
 
 def _save_profile(profile: PersistentProxyProfile) -> Path:
@@ -823,6 +843,7 @@ def install_persistent_profiles(
 
     installed: list[tuple[PersistentProxyProfile, PersistentProxyProfile | None]] = []
     attached: list[tuple[str, str]] = []
+    reserved_ports = _reserved_profile_ports()
     try:
         for provider, provider_host_names in sorted(provider_hosts.items()):
             profile_id = _profile_id(root, provider)
@@ -834,14 +855,22 @@ def install_persistent_profiles(
                 provider,
                 (upstreams or {}).get(provider, PROVIDERS[provider].upstream),
             )
-            port = int(
-                (ports or {}).get(
-                    provider,
-                    previous.port if previous is not None else _free_port(),
-                )
-            )
+            explicit_port = (ports or {}).get(provider)
+            if explicit_port is not None:
+                port = int(explicit_port)
+            elif previous is not None:
+                port = previous.port
+            else:
+                port = _free_port(excluded=set(reserved_ports))
             if not 1 <= port <= 65535:
                 raise ValueError("persistent proxy port must be in 1..65535")
+            owner = reserved_ports.get(port)
+            if owner is not None and owner != profile_id:
+                raise ValueError(
+                    f"persistent proxy port {port} is already reserved by "
+                    f"profile {owner}"
+                )
+            reserved_ports[port] = profile_id
 
             selected_kind = kind or _service_kind()
             artifact = str(_service_artifact(profile_id, selected_kind, home=home))
