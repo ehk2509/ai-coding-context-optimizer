@@ -9,6 +9,7 @@ from __future__ import annotations
 import sys
 
 from .cli import LEGACY_COMMANDS, main as legacy_main
+from .command_handlers.persistent_proxy import proxy_run_main
 from .command_registry import DEFAULT_COMMAND_REGISTRY
 from .product_ux import home_main
 
@@ -36,6 +37,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if not args:
         return home_main([])
+    if args[0] == "proxy-run":
+        return proxy_run_main(args[1:])
     return DEFAULT_COMMAND_REGISTRY.dispatch(args, legacy_main)
 
 
