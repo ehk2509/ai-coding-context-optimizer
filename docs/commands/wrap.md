@@ -102,7 +102,10 @@ the real `openclaw.json`:
 ACCO copies catalog metadata instead of inventing context-window or modality
 values. Direct API keys stay in process environment. OAuth/native/custom
 provider routes such as `openai-codex/*` are refused rather than converted to
-a guessed API-key transport.
+a guessed API-key transport. Configured model fallbacks are also refused for
+this adapter because an untouched fallback route could bypass ACCO after the
+primary fails; ACCO does not claim full interception when it cannot proxy every
+route.
 
 OpenClaw can choose an implicit Codex runtime only for exact official OpenAI
 Responses/ChatGPT routes with no authored request override. Because routing
