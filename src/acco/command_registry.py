@@ -89,6 +89,7 @@ from .command_handlers.output import (
     output_telemetry_main,
 )
 from .command_handlers.patch import pack_diff_main, review_main
+from .command_handlers.persistent_proxy import proxy_main, proxy_run_main
 from .command_handlers.pricing import pricing_main
 from .command_handlers.sdk import sdk_serve_main
 from .pack_cli import main as pack_main
@@ -177,6 +178,8 @@ DEFAULT_COMMAND_REGISTRY = CommandRegistry(
         CommandSpec("recovery-status", recovery_status_main),
         CommandSpec("prefix-status", prefix_status_main),
         CommandSpec("provider-proxy", provider_proxy_main),
+        CommandSpec("proxy", proxy_main),
+        CommandSpec("proxy-run", proxy_run_main),
         CommandSpec("browser-context", browser_context_main),
         CommandSpec("cache-economics", cache_economics_main),
         CommandSpec("continuity", continuity_main),
