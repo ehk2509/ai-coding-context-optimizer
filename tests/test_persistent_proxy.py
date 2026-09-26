@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import json
+from http.server import ThreadingHTTPServer
 from pathlib import Path
 import subprocess
+import threading
+from urllib.request import urlopen
 
 import pytest
 
 from acco import persistent_proxy
+from acco.provider_proxy import ProviderProxyConfig, _handler_factory
 from acco.persistent_proxy import (
     PersistentProxyProfile,
     attach_claude,
@@ -298,3 +302,33 @@ def test_install_rolls_back_first_provider_when_second_service_fails(
     assert not codex.exists() or "[model_providers.acco]" not in codex.read_text(
         encoding="utf-8"
     )
+
+
+def test_provider_proxy_health_reports_content_free_instance_identity(tmp_path):
+    """Persistent readiness must distinguish the expected ACCO listener from a random port."""
+    root = tmp_path / "repo"
+    root.mkdir()
+    config = ProviderProxyConfig(
+        root=root,
+        upstream="https://api.openai.com",
+        provider="openai",
+        bind="127.0.0.1",
+        port=19029,
+        instance_id="profile-abc",
+    )
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _handler_factory(config))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        port = server.server_address[1]
+        with urlopen(f"http://127.0.0.1:{port}/__acco/health") as response:
+            payload = json.loads(response.read())
+        assert payload["ok"] is True
+        assert payload["provider"] == "openai"
+        assert payload["instance_id"] == "profile-abc"
+        assert len(payload["root_fingerprint"]) == 16
+        assert str(root) not in json.dumps(payload)
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
