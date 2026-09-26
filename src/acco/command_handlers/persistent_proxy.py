@@ -54,9 +54,7 @@ def _mapping(values: list[str] | None, *, value_type: type = str) -> dict:
 
 def _selected_hosts(root: Path, requested: list[str] | None) -> tuple[str, ...]:
     """Resolve explicit or auto-detected durable host targets."""
-    if requested:
-        if "all" in requested:
-            return tuple(sorted(DURABLE_HOST_PROVIDER))
+    if requested and "all" not in requested:
         return tuple(dict.fromkeys(requested))
     statuses = detect_hosts(root)
     detected = [
