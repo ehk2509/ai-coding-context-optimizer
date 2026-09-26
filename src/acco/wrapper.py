@@ -269,9 +269,23 @@ def build_wrap_plan(
         if agent_key == "openclaw"
         else "generic"
     )
+    if host_adapter == "copilot" and selected_provider == "gemini":
+        raise ValueError(
+            "Copilot CLI custom-provider mode documents OpenAI-compatible/Azure "
+            "and Anthropic providers, not Gemini"
+        )
+    if host_adapter == "cursor-manual" and selected_provider != "openai":
+        raise ValueError(
+            "Cursor's documented custom base-URL override is currently the "
+            "OpenAI BYOK path"
+        )
     selected_env = (
         base_url_env
-        or ("COPILOT_PROVIDER_BASE_URL" if host_adapter == "copilot" else defaults.base_url_env)
+        or (
+            "COPILOT_PROVIDER_BASE_URL"
+            if host_adapter == "copilot"
+            else defaults.base_url_env
+        )
     )
     existing_base = environ.get(selected_env, "")
     selected_upstream = upstream or _upstream_from_existing_base(
