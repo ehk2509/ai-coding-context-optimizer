@@ -228,6 +228,8 @@ def test_dispatcher_exposes_command_discovery(capsys):
     assert "setup" in output
     assert "doctor" in output
     assert "completion" in output
+    assert "proxy" in output
+    assert "proxy-run" not in output
 
 
 
@@ -238,3 +240,25 @@ def test_top_level_help_merges_modern_and_legacy_commands(capsys):
     for command in ("setup", "doctor", "pack", "browse", "uninstall", "audit", "map"):
         assert f"  {command}" in output
     assert "docs/CLI_REFERENCE.md" in output
+
+
+def test_dispatcher_exposes_persistent_proxy_status_without_internal_runner(
+    tmp_path,
+    monkeypatch,
+    capsys,
+):
+    """Public proxy lifecycle should dispatch while proxy-run stays internal."""
+    state = tmp_path / "state"
+    project = tmp_path / "repo"
+    project.mkdir()
+    monkeypatch.setenv("ACCO_STATE_DIR", str(state))
+
+    assert main(["proxy", "status", str(project), "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["installed"] is False
+    assert payload["profiles"] == []
+
+    assert main(["--help"]) == 0
+    output = capsys.readouterr().out
+    assert "  proxy" in output
+    assert "proxy-run" not in output
