@@ -20,8 +20,11 @@ from acco.persistent_proxy import (
     detach_claude,
     detach_codex,
     install_persistent_profiles,
+    install_service,
     profiles_for_root,
     render_service_artifact,
+    start_service,
+    stop_service,
     uninstall_persistent_profiles,
 )
 
@@ -422,3 +425,64 @@ def test_codex_attachment_refuses_invalid_existing_toml(tmp_path):
         attach_codex(_profile(root, "openai", 19032, "codex"), home=home)
 
     assert config.read_text(encoding="utf-8") == before
+
+
+def test_launchd_stop_boots_out_and_start_rebootstraps(tmp_path, monkeypatch):
+    """macOS stop must not use kill with KeepAlive because launchd would restart it."""
+    monkeypatch.setattr(persistent_proxy.os, "getuid", lambda: 501)
+    calls = []
+    runner = _ok_runner(calls)
+    artifact = tmp_path / "Library/LaunchAgents/com.acco.proxy.mac.plist"
+    artifact.parent.mkdir(parents=True)
+    artifact.write_text("<plist/>", encoding="utf-8")
+    profile = PersistentProxyProfile(
+        profile_id="mac",
+        root=str(tmp_path),
+        provider="anthropic",
+        upstream="https://api.anthropic.com",
+        port=19033,
+        hosts=("claude",),
+        service_kind="launchd-user",
+        service_artifact=str(artifact),
+    )
+
+    stop_service(profile, runner=runner)
+    start_service(profile, runner=runner)
+
+    argv = [item[0] for item in calls]
+    assert [
+        "launchctl",
+        "bootout",
+        "gui/501",
+        str(artifact),
+    ] in argv
+    assert [
+        "launchctl",
+        "bootstrap",
+        "gui/501",
+        str(artifact),
+    ] in argv
+    assert not any("kill" in command for command in argv)
+
+
+def test_windows_install_ends_previous_task_before_recreate(tmp_path, monkeypatch):
+    """Windows reconfiguration should restart rather than leave stale task runtime."""
+    monkeypatch.setenv("ACCO_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.setattr(
+        persistent_proxy,
+        "_resolve_acco_command",
+        lambda: [r"C:\Tools\acco.exe"],
+    )
+    calls = []
+    install_service(
+        "winprofile",
+        kind="windows-task",
+        home=tmp_path,
+        runner=_ok_runner(calls),
+    )
+    argv = [item[0] for item in calls]
+
+    assert argv[0] == ["schtasks", "/End", "/TN", "ACCO Proxy winprofile"]
+    assert argv[1][:3] == ["schtasks", "/Create", "/TN"]
+    assert "--state-dir" in argv[1][argv[1].index("/TR") + 1]
+    assert argv[2] == ["schtasks", "/Run", "/TN", "ACCO Proxy winprofile"]
