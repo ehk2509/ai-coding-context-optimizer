@@ -12,6 +12,13 @@ import sys
 import time
 from urllib.parse import urlsplit, urlunsplit
 
+from .wrap_adapters import (
+    copilot_provider_hint,
+    cursor_setup_lines,
+    prepare_copilot_env,
+    prepare_openclaw_env,
+)
+
 
 @dataclass(frozen=True)
 class ProviderDefaults:
