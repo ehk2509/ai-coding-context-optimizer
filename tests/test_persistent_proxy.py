@@ -72,9 +72,12 @@ def test_service_artifacts_are_user_scoped_and_credential_free(tmp_path, monkeyp
         home=tmp_path,
     )
     assert linux_path == tmp_path / ".config/systemd/user/acco-proxy-abc123.service"
+    expected_state = persistent_proxy._systemd_escape_arg(
+        str(tmp_path / "state")
+    )
     assert (
         "ExecStart=/opt/acco/bin/acco proxy-run abc123 --state-dir "
-        + str(tmp_path / "state")
+        + expected_state
     ) in linux
     assert "API_KEY" not in linux
 
@@ -430,7 +433,12 @@ def test_codex_attachment_refuses_invalid_existing_toml(tmp_path):
 
 def test_launchd_stop_boots_out_and_start_rebootstraps(tmp_path, monkeypatch):
     """macOS stop must not use kill with KeepAlive because launchd would restart it."""
-    monkeypatch.setattr(persistent_proxy.os, "getuid", lambda: 501)
+    monkeypatch.setattr(
+        persistent_proxy.os,
+        "getuid",
+        lambda: 501,
+        raising=False,
+    )
     calls = []
     runner = _ok_runner(calls)
     artifact = tmp_path / "Library/LaunchAgents/com.acco.proxy.mac.plist"
