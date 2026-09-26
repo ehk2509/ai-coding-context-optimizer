@@ -241,9 +241,28 @@ def _openclaw_model_entry(
         "id": model_id,
         "name": str(row.get("name") or model_id),
     }
-    for key in ("contextWindow", "contextTokens", "maxTokens", "reasoning", "cost"):
+    for key in (
+        "contextWindow",
+        "contextTokens",
+        "maxTokens",
+        "reasoning",
+        "cost",
+        "agentRuntime",
+        "compat",
+    ):
         if key in row and row[key] is not None:
             entry[key] = row[key]
+    if provider_id == "openai":
+        runtime = row.get("agentRuntime")
+        runtime_id = runtime.get("id") if isinstance(runtime, dict) else None
+        if runtime_id != "openclaw":
+            raise ValueError(
+                "OpenClaw openai/* wrap would replace the exact official route "
+                "with a custom provider and can change implicit Codex/OpenClaw "
+                "runtime selection. Set model-scoped agentRuntime.id=openclaw "
+                "before wrapping, or leave this route unwrapped."
+            )
+
     input_value = row.get("input")
     if isinstance(input_value, list):
         entry["input"] = input_value
@@ -353,10 +372,14 @@ def prepare_openclaw_env(
         },
     }
     overlay["agents"] = {"defaults": {"model": wrapped_model}}
-    temp_path.write_text(
-        json.dumps(overlay, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
+    try:
+        temp_path.write_text(
+            json.dumps(overlay, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+    except BaseException:
+        temp_path.unlink(missing_ok=True)
+        raise
 
     env["OPENCLAW_CONFIG_PATH"] = str(temp_path)
     env["ACCO_OPENCLAW_PROVIDER_KEY"] = key_value
