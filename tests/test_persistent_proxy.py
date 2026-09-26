@@ -23,6 +23,7 @@ from acco.persistent_proxy import (
     install_service,
     profiles_for_root,
     render_service_artifact,
+    run_profile,
     start_service,
     stop_service,
     uninstall_persistent_profiles,
@@ -486,3 +487,37 @@ def test_windows_install_ends_previous_task_before_recreate(tmp_path, monkeypatc
     assert argv[1][:3] == ["schtasks", "/Create", "/TN"]
     assert "--state-dir" in argv[1][argv[1].index("/TR") + 1]
     assert argv[2] == ["schtasks", "/Run", "/TN", "ACCO Proxy winprofile"]
+
+
+def test_persistent_runner_uses_project_provider_settings(tmp_path, monkeypatch):
+    """Background runtime must match foreground provider-proxy project policy."""
+    root = tmp_path / "repo"
+    state = tmp_path / "state"
+    root.mkdir()
+    monkeypatch.setenv("ACCO_STATE_DIR", str(state))
+    (root / ".acco.toml").write_text(
+        "[provider]\n"
+        "prefix_tracking = false\n"
+        "history_dedup = false\n"
+        'model_routing = "observe"\n'
+        'routing_calibration_file = "custom-routing.json"\n'
+        "routing_min_savings = 0.17\n",
+        encoding="utf-8",
+    )
+    profile = _profile(root, "anthropic", 19034, "claude")
+    persistent_proxy._save_profile(profile)
+    captured = {}
+
+    def fake_run(config):
+        captured["config"] = config
+
+    monkeypatch.setattr(persistent_proxy, "run_provider_proxy", fake_run)
+
+    assert run_profile(profile.profile_id) == 0
+    config = captured["config"]
+    assert config.prefix_tracking is False
+    assert config.deduplicate_history is False
+    assert config.model_routing_mode == "observe"
+    assert config.model_routing_calibration_file == "custom-routing.json"
+    assert config.model_routing_min_savings == 0.17
+    assert config.instance_id == persistent_proxy._runtime_instance_id(profile)
