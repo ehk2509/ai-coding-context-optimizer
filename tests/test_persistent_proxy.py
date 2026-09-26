@@ -349,3 +349,60 @@ def test_provider_proxy_health_reports_content_free_instance_identity(tmp_path):
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+def test_uninstall_refuses_dangling_claude_local_route(tmp_path, monkeypatch):
+    """A damaged ownership marker must not let uninstall strand Claude."""
+    root = tmp_path / "repo"
+    state = tmp_path / "state"
+    root.mkdir()
+    monkeypatch.setenv("ACCO_STATE_DIR", str(state))
+    profile = _profile(root, "anthropic", 19030, "claude")
+    persistent_proxy._save_profile(profile)
+
+    settings = root / ".claude" / "settings.json"
+    settings.parent.mkdir()
+    settings.write_text(
+        json.dumps({"env": {"ANTHROPIC_BASE_URL": profile.local_base_url}}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="ownership marker is missing"):
+        uninstall_persistent_profiles(
+            root,
+            runner=_ok_runner([]),
+        )
+
+    assert profiles_for_root(root) == (profile,)
+    assert json.loads(settings.read_text(encoding="utf-8"))["env"][
+        "ANTHROPIC_BASE_URL"
+    ] == profile.local_base_url
+
+
+def test_uninstall_refuses_dangling_codex_local_route(tmp_path, monkeypatch):
+    """A markerless Codex route must keep its service until ownership is resolved."""
+    root = tmp_path / "repo"
+    state = tmp_path / "state"
+    root.mkdir()
+    monkeypatch.setenv("ACCO_STATE_DIR", str(state))
+    profile = _profile(root, "openai", 19031, "codex")
+    persistent_proxy._save_profile(profile)
+
+    config = root / ".codex" / "config.toml"
+    config.parent.mkdir()
+    config.write_text(
+        'model_provider = "acco"\n'
+        f'openai_base_url = "{profile.local_base_url}"\n\n'
+        "[model_providers.acco]\n"
+        f'base_url = "{profile.local_base_url}"\n',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="ownership markers are missing"):
+        uninstall_persistent_profiles(
+            root,
+            runner=_ok_runner([]),
+        )
+
+    assert profiles_for_root(root) == (profile,)
+    assert profile.local_base_url in config.read_text(encoding="utf-8")
