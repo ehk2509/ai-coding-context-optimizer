@@ -230,6 +230,12 @@ def _openclaw_model_entry(
             "ACCO will not invent context-window/capability values"
         )
 
+    if not isinstance(row.get("contextWindow"), int):
+        raise ValueError(
+            f"OpenClaw catalog metadata for {model_ref!r} lacks contextWindow; "
+            "ACCO will not create a route with guessed token limits"
+        )
+
     model_id = model_ref.split("/", 1)[1]
     entry: dict[str, Any] = {
         "id": model_id,
