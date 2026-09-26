@@ -385,10 +385,14 @@ def stop_service(
             check=False,
         )
     elif profile.service_kind == "launchd-user":
-        label = f"com.acco.proxy.{profile.profile_id}"
         _run(
             runner,
-            ["launchctl", "kill", "SIGTERM", f"gui/{os.getuid()}/{label}"],
+            [
+                "launchctl",
+                "bootout",
+                f"gui/{os.getuid()}",
+                profile.service_artifact,
+            ],
             check=False,
         )
     elif profile.service_kind == "windows-task":
@@ -414,8 +418,24 @@ def start_service(
         label = f"com.acco.proxy.{profile.profile_id}"
         _run(
             runner,
-            ["launchctl", "kickstart", "-k", f"gui/{os.getuid()}/{label}"],
+            [
+                "launchctl",
+                "bootout",
+                f"gui/{os.getuid()}",
+                profile.service_artifact,
+            ],
+            check=False,
         )
+        _run(
+            runner,
+            [
+                "launchctl",
+                "bootstrap",
+                f"gui/{os.getuid()}",
+                profile.service_artifact,
+            ],
+        )
+        _run(runner, ["launchctl", "enable", f"gui/{os.getuid()}/{label}"])
     elif profile.service_kind == "windows-task":
         _run(
             runner,
@@ -445,16 +465,6 @@ def uninstall_service(
         artifact.unlink(missing_ok=True)
         _run(runner, ["systemctl", "--user", "daemon-reload"], check=False)
     elif profile.service_kind == "launchd-user":
-        _run(
-            runner,
-            [
-                "launchctl",
-                "bootout",
-                f"gui/{os.getuid()}",
-                str(artifact),
-            ],
-            check=False,
-        )
         artifact.unlink(missing_ok=True)
     elif profile.service_kind == "windows-task":
         _run(
