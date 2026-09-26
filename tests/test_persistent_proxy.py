@@ -521,3 +521,69 @@ def test_persistent_runner_uses_project_provider_settings(tmp_path, monkeypatch)
     assert config.model_routing_calibration_file == "custom-routing.json"
     assert config.model_routing_min_savings == 0.17
     assert config.instance_id == persistent_proxy._runtime_instance_id(profile)
+
+
+def test_stopped_profile_port_remains_reserved_for_other_projects(
+    tmp_path,
+    monkeypatch,
+):
+    """Stable ports must not be reused just because an existing proxy is stopped."""
+    state = tmp_path / "state"
+    root_one = tmp_path / "one"
+    root_two = tmp_path / "two"
+    root_one.mkdir()
+    root_two.mkdir()
+    monkeypatch.setenv("ACCO_STATE_DIR", str(state))
+
+    first = _profile(root_one, "anthropic", 19035, "claude")
+    persistent_proxy._save_profile(first)
+    monkeypatch.setattr(persistent_proxy, "_wait_profile_ready", lambda _profile: True)
+    monkeypatch.setattr(
+        persistent_proxy,
+        "_resolve_acco_command",
+        lambda: ["/opt/acco/bin/acco"],
+    )
+
+    with pytest.raises(ValueError, match="already reserved"):
+        install_persistent_profiles(
+            root_two,
+            ("claude",),
+            ports={"anthropic": 19035},
+            kind="systemd-user",
+            home=tmp_path / "home",
+            runner=_ok_runner([]),
+        )
+
+    assert profiles_for_root(root_two) == ()
+
+
+def test_new_profile_allocator_skips_reserved_stopped_port(tmp_path, monkeypatch):
+    """Automatic allocation should retry when the OS offers a persisted port."""
+    state = tmp_path / "state"
+    root_one = tmp_path / "one"
+    root_two = tmp_path / "two"
+    root_one.mkdir()
+    root_two.mkdir()
+    monkeypatch.setenv("ACCO_STATE_DIR", str(state))
+    persistent_proxy._save_profile(
+        _profile(root_one, "anthropic", 19036, "claude")
+    )
+
+    offered = iter([19036, 19037])
+
+    class FakeSocket:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def bind(self, _address):
+            return None
+
+        def getsockname(self):
+            return ("127.0.0.1", next(offered))
+
+    monkeypatch.setattr(persistent_proxy.socket, "socket", lambda *_a, **_k: FakeSocket())
+
+    assert persistent_proxy._free_port(excluded={19036}) == 19037
