@@ -130,7 +130,6 @@ def test_openclaw_overlay_preserves_original_and_catalog_metadata(tmp_path, monk
         if argv[1:4] == ["config", "get", "agents.defaults.model"]:
             return {
                 "primary": "openai/gpt-5.6-sol",
-                "fallbacks": ["openai/gpt-5.6-luna"],
             }
         if argv[1:4] == ["models", "list", "--provider"]:
             return {
@@ -172,9 +171,7 @@ def test_openclaw_overlay_preserves_original_and_catalog_metadata(tmp_path, monk
     assert provider["models"][0]["contextWindow"] == 400000
     assert provider["models"][0]["agentRuntime"] == {"id": "openclaw"}
     assert provider["models"][0]["input"] == ["text", "image"]
-    assert overlay["agents"]["defaults"]["model"]["fallbacks"] == [
-        "openai/gpt-5.6-luna"
-    ]
+    assert "fallbacks" not in overlay["agents"]["defaults"]["model"]
     assert overlay["agents"]["defaults"]["model"]["primary"] == "acco-wrap/gpt-5.6-sol"
     assert prepared.env["ACCO_OPENCLAW_PROVIDER_KEY"] == "secret"
     assert prepared.cleanup_paths == (temp_path,)
@@ -299,3 +296,28 @@ def test_cursor_manual_bridge_rejects_child_args(tmp_path, monkeypatch):
             plan,
             proxy_url="http://127.0.0.1:8787/v1",
         )
+
+
+def test_openclaw_fallbacks_fail_closed_before_overlay_creation(tmp_path, monkeypatch):
+    """Fallback traffic must never escape ACCO silently after primary failure."""
+    home = tmp_path / "home"
+    (home / ".openclaw").mkdir(parents=True)
+
+    monkeypatch.setattr(
+        wrap_adapters,
+        "_run_json",
+        lambda _argv, *, env: {
+            "primary": "anthropic/claude-sonnet-5",
+            "fallbacks": ["anthropic/claude-haiku-4-5"],
+        },
+    )
+
+    with pytest.raises(ValueError, match="fallbacks.*bypass ACCO"):
+        prepare_openclaw_env(
+            "openclaw",
+            {"HOME": str(home), "ANTHROPIC_API_KEY": "secret"},
+            provider="anthropic",
+            proxy_url="http://127.0.0.1:8787",
+        )
+
+    assert not list((home / ".openclaw").glob(".acco-wrap-*.json"))
