@@ -157,6 +157,25 @@ winget install --id ElyesHkiri.ACCO
 
 See [Native release signing and package publication](RELEASE_SIGNING.md).
 
+## Persistent provider proxy (optional)
+
+After normal setup, Claude Code and Codex can use a durable background ACCO provider proxy instead of launching through `acco wrap` each time:
+
+```bash
+acco proxy install . --host claude --host codex
+acco proxy status .
+```
+
+Linux uses a `systemd --user` service, macOS uses a user LaunchAgent, and Windows uses a current-user logon task. Persistent profile/service files contain no API keys; client authentication continues to flow in the provider request itself. Host routing is changed only after ACCO verifies the expected local proxy instance is actually listening.
+
+Remove the durable routing and autostart services with:
+
+```bash
+acco proxy uninstall .
+```
+
+See [persistent proxy lifecycle](commands/proxy.md) for host limitations, custom upstreams, stable ports, and rollback behavior.
+
 ## Upgrade and repair
 
 Inspect the package-manager command ACCO would use:
