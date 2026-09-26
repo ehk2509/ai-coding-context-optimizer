@@ -79,6 +79,22 @@ def _profile_id(root: Path, provider: str) -> str:
     return hashlib.sha256(identity.encode()).hexdigest()[:16]
 
 
+def _runtime_instance_id(profile: PersistentProxyProfile) -> str:
+    """Return a content-free identity that changes with runtime configuration."""
+    identity = json.dumps(
+        {
+            "profile_id": profile.profile_id,
+            "root": profile.root,
+            "provider": profile.provider,
+            "upstream": profile.upstream,
+            "port": profile.port,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(identity.encode()).hexdigest()[:24]
+
+
 def _atomic_text(path: Path, text: str) -> None:
     """Atomically write a private UTF-8 text artifact."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -308,9 +324,12 @@ def install_service(
                 "systemctl",
                 "--user",
                 "enable",
-                "--now",
                 path.name,
             ],
+        )
+        _run(
+            runner,
+            ["systemctl", "--user", "restart", path.name],
         )
     elif selected == "launchd-user":
         uid = str(os.getuid())
@@ -325,6 +344,7 @@ def install_service(
     elif selected == "windows-task":
         task = f"ACCO Proxy {profile_id}"
         command = subprocess.list2cmdline(_service_command(profile_id))
+        _run(runner, ["schtasks", "/End", "/TN", task], check=False)
         _run(
             runner,
             [
@@ -458,7 +478,7 @@ def proxy_alive(profile: PersistentProxyProfile, timeout: float = 0.4) -> bool:
         isinstance(payload, dict)
         and payload.get("ok") is True
         and payload.get("provider") == profile.provider
-        and payload.get("instance_id") == profile.profile_id
+        and payload.get("instance_id") == _runtime_instance_id(profile)
         and payload.get("root_fingerprint") == expected_root
     )
 
@@ -852,7 +872,7 @@ def run_profile(profile_id: str) -> int:
             provider=profile.provider,
             bind="127.0.0.1",
             port=profile.port,
-            instance_id=profile.profile_id,
+            instance_id=_runtime_instance_id(profile),
         )
     )
     return 0
