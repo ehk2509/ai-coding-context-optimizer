@@ -40,9 +40,10 @@ existing profile's stable port unless a new provider-specific port is supplied.
 | macOS | user LaunchAgent under ~/Library/LaunchAgents |
 | Windows | current-user Task Scheduler logon task |
 
-The service command contains only the ACCO executable and a content-free profile
-identifier. API keys and provider authorization tokens are not written to the
-service artifact or persistent profile manifest. The provider client continues
+The service definition stores the ACCO executable path, a content-free profile
+identifier, and the ACCO state-directory path needed to find that profile after
+login. It stores no API keys, provider authorization tokens, prompts, tool output,
+or source content. The provider client continues
 to supply its normal authentication headers on requests through the loopback proxy.
 
 ## Verified readiness before host mutation
