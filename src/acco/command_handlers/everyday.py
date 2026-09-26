@@ -50,7 +50,6 @@ def wrap_main(argv: list[str]) -> int:
         ),
     )
     parser.add_argument("agent", metavar="COMMAND")
-    parser.add_argument("agent_args", nargs=argparse.REMAINDER)
     parser.add_argument("--path", default=".")
     parser.add_argument("--bind", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=0)
@@ -72,10 +71,14 @@ def wrap_main(argv: list[str]) -> int:
     )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--json", action="store_true")
-    args = parser.parse_args(argv)
-    trailing = list(args.agent_args)
-    if trailing and trailing[0] == "--":
-        trailing = trailing[1:]
+    if "--" in argv:
+        separator = argv.index("--")
+        wrapper_argv = argv[:separator]
+        trailing = argv[separator + 1 :]
+    else:
+        wrapper_argv = argv
+        trailing = []
+    args = parser.parse_args(wrapper_argv)
     try:
         plan = build_wrap_plan(
             args.agent,
