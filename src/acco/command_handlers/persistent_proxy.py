@@ -44,7 +44,7 @@ def _mapping(values: list[str] | None, *, value_type: type = str) -> dict:
         key, value = raw.split("=", 1)
         key = key.strip().lower()
         value = value.strip()
-        if key not in {"anthropic", "openai", "gemini"}:
+        if key not in set(DURABLE_HOST_PROVIDER.values()):
             raise ValueError(f"unsupported provider mapping: {key}")
         if not value:
             raise ValueError(f"empty value for provider: {key}")
