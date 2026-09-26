@@ -139,7 +139,8 @@ def test_codex_attachment_preserves_unrelated_toml_and_oauth_mode(tmp_path):
     root.mkdir()
     codex_dir = home / ".codex"
     codex_dir.mkdir(parents=True)
-    config = codex_dir / "config.toml"
+    config = root / ".codex" / "config.toml"
+    config.parent.mkdir(parents=True)
     config.write_text(
         'model = "gpt-5.6-sol"\n\n[features]\nweb_search = true\n',
         encoding="utf-8",
@@ -161,6 +162,7 @@ def test_codex_attachment_preserves_unrelated_toml_and_oauth_mode(tmp_path):
     assert "web_search = true" in second
     assert second.count("[model_providers.acco]") == 1
     assert f'base_url = "http://127.0.0.1:19023/v1"' in second
+    assert "supports_websockets = false" in second
     assert "requires_openai_auth = true" in second
 
     detach_codex(profile, home=home)
@@ -176,7 +178,7 @@ def test_codex_attachment_refuses_existing_root_routing(tmp_path):
     root = tmp_path / "repo"
     home = tmp_path / "home"
     root.mkdir()
-    config = home / ".codex" / "config.toml"
+    config = root / ".codex" / "config.toml"
     config.parent.mkdir(parents=True)
     config.write_text(
         'model_provider = "company"\n\n[model_providers.company]\n'
@@ -226,7 +228,7 @@ def test_install_two_provider_profiles_and_uninstall_transactionally(
         (root / ".claude" / "settings.json").read_text(encoding="utf-8")
     )
     assert settings["env"]["ANTHROPIC_BASE_URL"] == "http://127.0.0.1:19025"
-    codex = (home / ".codex" / "config.toml").read_text(encoding="utf-8")
+    codex = (root / ".codex" / "config.toml").read_text(encoding="utf-8")
     assert 'base_url = "http://127.0.0.1:19026/v1"' in codex
 
     service_calls = [argv for argv, _kwargs in calls]
@@ -249,7 +251,7 @@ def test_install_two_provider_profiles_and_uninstall_transactionally(
     )
     assert "ANTHROPIC_BASE_URL" not in settings.get("env", {})
     assert "[model_providers.acco]" not in (
-        home / ".codex" / "config.toml"
+        root / ".codex" / "config.toml"
     ).read_text(encoding="utf-8")
 
 
@@ -298,7 +300,7 @@ def test_install_rolls_back_first_provider_when_second_service_fails(
     if settings_path.exists():
         settings = json.loads(settings_path.read_text(encoding="utf-8"))
         assert "ANTHROPIC_BASE_URL" not in settings.get("env", {})
-    codex = home / ".codex" / "config.toml"
+    codex = root / ".codex" / "config.toml"
     assert not codex.exists() or "[model_providers.acco]" not in codex.read_text(
         encoding="utf-8"
     )
