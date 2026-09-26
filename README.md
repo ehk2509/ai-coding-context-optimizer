@@ -144,6 +144,9 @@ acco guardian .
 acco wrap claude
 acco wrap aider -- --model gpt-4.1
 OPENAI_API_KEY=... acco wrap opencode
+COPILOT_PROVIDER_TYPE=anthropic COPILOT_MODEL=claude-sonnet-5 acco wrap copilot
+acco wrap cursor --provider openai
+OPENAI_API_KEY=... acco wrap openclaw
 acco lean-skill . --install --host all
 acco context-audit .
 acco statusline .
@@ -151,7 +154,9 @@ acco statusline .
 
 Claude integrations capture a bounded structured checkpoint before compaction,
 `wrap` can launch Claude/Codex/Gemini or infer the provider for arbitrary provider-aware CLIs through the loopback provider boundary,
-the portable Lean skill constrains final prose without reducing verification,
+Copilot CLI has a documented BYOK-env adapter, OpenClaw direct API routes use
+a temporary config overlay, and Cursor uses a safe manual BYOK bridge rather
+than undocumented private-state edits. The portable Lean skill constrains final prose without reducing verification,
 unknown tool outputs can fall back to payload-aware JSON/diff/log/table
 processors, the context auditor covers cross-host instruction bloat, and the
 status line surfaces local efficiency signals continuously. See
