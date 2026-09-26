@@ -343,13 +343,87 @@ def _provider_proxy_argv(root: Path, plan: WrapPlan, model_routing: str) -> list
     ]
 
 
-def _child_env(plan: WrapPlan, proxy_url: str | None = None) -> dict[str, str]:
-    """Return the child environment with only the selected provider redirected."""
+def _child_env(
+    plan: WrapPlan,
+    proxy_url: str | None = None,
+    *,
+    executable: str | None = None,
+) -> tuple[dict[str, str], tuple[Path, ...]]:
+    """Return host-aware child environment and temporary artifacts."""
     env = os.environ.copy()
-    env[plan.base_url_env] = proxy_url or plan.local_base_url
+    target = proxy_url or plan.local_base_url
+    cleanup: tuple[Path, ...] = ()
+    if plan.host_adapter == "copilot":
+        env = prepare_copilot_env(
+            env,
+            provider=plan.provider,
+            proxy_url=target,
+            args=plan.argv,
+        )
+    elif plan.host_adapter == "openclaw":
+        if executable is None:
+            raise ValueError("OpenClaw wrap requires a resolved executable")
+        prepared = prepare_openclaw_env(
+            executable,
+            env,
+            provider=plan.provider,
+            proxy_url=target,
+        )
+        env = prepared.env
+        cleanup = prepared.cleanup_paths
+    elif plan.host_adapter != "cursor-manual":
+        env[plan.base_url_env] = target
     env["ACCO_WRAPPED"] = "1"
     env["ACCO_WRAP_PROVIDER"] = plan.provider
-    return env
+    return env, cleanup
+
+
+def _cleanup_wrap_paths(paths: tuple[Path, ...]) -> None:
+    """Remove only temporary files created by the current wrap session."""
+    for path in paths:
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
+def _stop_proxy(proxy: subprocess.Popen) -> None:
+    """Terminate one ephemeral proxy process without leaking it on child exit."""
+    if proxy.poll() is not None:
+        return
+    proxy.terminate()
+    try:
+        proxy.wait(timeout=2)
+    except subprocess.TimeoutExpired:
+        proxy.kill()
+        proxy.wait(timeout=2)
+
+
+def _run_cursor_manual(
+    root: Path,
+    plan: WrapPlan,
+    *,
+    model_routing: str,
+    proxy_url: str | None,
+) -> int:
+    """Run Cursor's documented manual BYOK bridge without private-state edits."""
+    target = proxy_url or plan.local_base_url
+    lines = cursor_setup_lines(target, plan.provider)
+    if proxy_url:
+        print("\n".join(lines))
+        return 0
+
+    proxy = subprocess.Popen(_provider_proxy_argv(root, plan, model_routing))
+    try:
+        _wait_for_proxy(plan.bind, plan.port)
+        print("\n".join(lines))
+        print("Press Ctrl-C to stop the ACCO proxy session.")
+        try:
+            return int(proxy.wait())
+        except KeyboardInterrupt:
+            return 0
+    finally:
+        _stop_proxy(proxy)
 
 
 def run_wrap(
@@ -363,34 +437,44 @@ def run_wrap(
     if os.environ.get("ACCO_WRAPPED") == "1":
         raise RuntimeError("nested acco wrap detected; launch the child command directly")
 
+    if plan.host_adapter == "cursor-manual":
+        return _run_cursor_manual(
+            root,
+            plan,
+            model_routing=model_routing,
+            proxy_url=proxy_url,
+        )
+
     executable = shutil.which(plan.executable)
     if executable is None:
         raise FileNotFoundError(f"agent executable not found: {plan.executable}")
 
     if proxy_url:
-        completed = subprocess.run(
-            [executable, *plan.argv],
-            env=_child_env(plan, proxy_url),
-            cwd=root,
-            check=False,
-        )
-        return int(completed.returncode)
+        env, cleanup = _child_env(plan, proxy_url, executable=executable)
+        try:
+            completed = subprocess.run(
+                [executable, *plan.argv],
+                env=env,
+                cwd=root,
+                check=False,
+            )
+            return int(completed.returncode)
+        finally:
+            _cleanup_wrap_paths(cleanup)
 
     proxy_argv = _provider_proxy_argv(root, plan, model_routing)
     proxy = subprocess.Popen(proxy_argv)
+    cleanup: tuple[Path, ...] = ()
     try:
         _wait_for_proxy(plan.bind, plan.port)
+        env, cleanup = _child_env(plan, executable=executable)
         completed = subprocess.run(
             [executable, *plan.argv],
-            env=_child_env(plan),
+            env=env,
             cwd=root,
             check=False,
         )
         return int(completed.returncode)
     finally:
-        proxy.terminate()
-        try:
-            proxy.wait(timeout=2)
-        except subprocess.TimeoutExpired:
-            proxy.kill()
-            proxy.wait(timeout=2)
+        _cleanup_wrap_paths(cleanup)
+        _stop_proxy(proxy)
