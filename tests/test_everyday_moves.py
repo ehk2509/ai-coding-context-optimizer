@@ -76,9 +76,9 @@ def test_wrapper_presets_keep_provider_specific_base_paths():
     assert gemini.base_url_env == "GOOGLE_GEMINI_BASE_URL"
 
 
-def test_unknown_wrapper_requires_explicit_provider_boundary():
+def test_unknown_wrapper_without_provider_signal_requires_explicit_boundary():
     try:
-        build_wrap_plan("custom-agent", [], port=8126)
+        build_wrap_plan("custom-agent", [], port=8126, env={})
     except ValueError as exc:
         assert "--provider" in str(exc)
     else:
