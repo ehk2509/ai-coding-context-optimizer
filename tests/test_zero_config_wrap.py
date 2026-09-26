@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from acco.command_handlers.everyday import wrap_main
 from acco.wrapper import WrapPlan, build_wrap_plan, run_wrap
 
 
@@ -151,3 +152,32 @@ def test_nested_wrap_is_rejected(tmp_path, monkeypatch):
 
     with pytest.raises(RuntimeError, match="nested acco wrap"):
         run_wrap(Path(tmp_path), plan)
+
+
+def test_wrap_cli_accepts_wrapper_flags_after_command_and_child_args(
+    monkeypatch,
+    capsys,
+):
+    """Wrapper flags should parse before the separator while child args pass through."""
+    monkeypatch.setenv("OPENAI_API_KEY", "secret")
+
+    code = wrap_main(
+        [
+            "aider",
+            "--port",
+            "19008",
+            "--dry-run",
+            "--json",
+            "--",
+            "--model",
+            "gpt-4.1",
+            "--yes",
+        ]
+    )
+
+    assert code == 0
+    payload = __import__("json").loads(capsys.readouterr().out)
+    assert payload["provider"] == "openai"
+    assert payload["provider_source"] == "model"
+    assert payload["local_base_url"] == "http://127.0.0.1:19008/v1"
+    assert payload["argv"] == ["--model", "gpt-4.1", "--yes"]
