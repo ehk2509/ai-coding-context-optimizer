@@ -538,8 +538,27 @@ def attach_claude(profile: PersistentProxyProfile) -> None:
     update_json(path, mutate)
 
 
+def _validate_claude_detach(profile: PersistentProxyProfile) -> None:
+    """Refuse service removal when Claude still points at us without ownership."""
+    path = claude_settings_path(Path(profile.root))
+    if not path.exists():
+        return
+    payload = _read_json_object(path)
+    env = payload.get("env")
+    if not isinstance(env, dict):
+        return
+    owner = str(env.get(CLAUDE_PROFILE_ENV, "")).strip()
+    current = str(env.get("ANTHROPIC_BASE_URL", "")).strip()
+    if not owner and current == profile.local_base_url:
+        raise ValueError(
+            "Claude still points at this ACCO proxy but its ownership marker is "
+            "missing; restore/remove the routing explicitly before uninstall"
+        )
+
+
 def detach_claude(profile: PersistentProxyProfile) -> None:
     """Remove only Claude routing still owned by this persistent profile."""
+    _validate_claude_detach(profile)
     path = claude_settings_path(Path(profile.root))
     if not path.exists():
         return
@@ -662,9 +681,36 @@ def attach_codex(profile: PersistentProxyProfile, *, home: Path | None = None) -
     _atomic_text(path, rendered)
 
 
+def _validate_codex_detach(profile: PersistentProxyProfile) -> None:
+    """Refuse removal when Codex appears routed to us without complete markers."""
+    path = Path(profile.root) / ".codex" / "config.toml"
+    if not path.exists():
+        return
+    text = path.read_text(encoding="utf-8")
+    start_marker, end_marker = _codex_markers(profile.profile_id)
+    has_start = start_marker in text
+    has_end = end_marker in text
+    if has_start != has_end:
+        raise ValueError("ACCO persistent Codex block is incomplete")
+    if has_start:
+        return
+    if (
+        profile.local_base_url in text
+        and (
+            '[model_providers.acco]' in text
+            or re.search(r'(?m)^[ \t]*model_provider[ \t]*=[ \t]*"acco"', text)
+        )
+    ):
+        raise ValueError(
+            "Codex still points at this ACCO proxy but its ownership markers are "
+            "missing; restore/remove the routing explicitly before uninstall"
+        )
+
+
 def detach_codex(profile: PersistentProxyProfile, *, home: Path | None = None) -> None:
     """Remove only the marked persistent Codex provider block."""
     del home
+    _validate_codex_detach(profile)
     path = Path(profile.root) / ".codex" / "config.toml"
     if not path.exists():
         return
@@ -691,6 +737,17 @@ def attach_host(
         f"persistent automatic provider attachment is not supported for {host!r}; "
         "use acco wrap for that host"
     )
+
+
+def validate_detach_host(
+    host: str,
+    profile: PersistentProxyProfile,
+) -> None:
+    """Preflight host ownership before any persistent service is removed."""
+    if host == "claude":
+        _validate_claude_detach(profile)
+    elif host == "codex":
+        _validate_codex_detach(profile)
 
 
 def detach_host(
@@ -833,6 +890,10 @@ def uninstall_persistent_profiles(
 ) -> dict[str, Any]:
     """Detach hosts and remove all persistent profiles for one project."""
     profiles = profiles_for_root(root)
+    for profile in profiles:
+        for host in profile.hosts:
+            validate_detach_host(host, profile)
+
     removed: list[str] = []
     for profile in profiles:
         for host in profile.hosts:
