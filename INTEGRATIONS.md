@@ -119,9 +119,18 @@ does not modify a pull request or publish benchmark claims.
 
 ## Provider base-URL integration
 
-The v1.13 provider proxy is separate from Claude/Cursor/Codex managed setup. It
-is an explicit local reverse proxy for clients that can choose their API base
-URL:
+The provider proxy is separate from MCP/setup integration. `acco wrap` now
+layers host-specific launch adapters over the same local reverse proxy:
+
+- GitHub Copilot CLI uses its documented `COPILOT_PROVIDER_*` BYOK variables;
+- OpenClaw direct `openai/*`, `anthropic/*`, and `google/*` API routes use
+  an ephemeral sibling config overlay and leave the real config unchanged;
+- Cursor starts a local proxy session and prints the documented OpenAI BYOK
+  base-URL setting, because Cursor does not publish a stable machine-writable
+  provider setting and ACCO will not edit private state.
+
+Generic clients that honor standard provider base-URL environment variables can
+still use `acco wrap COMMAND` directly. The lower-level proxy remains available:
 
 ```bash
 acco provider-proxy . \

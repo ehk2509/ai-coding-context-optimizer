@@ -12,6 +12,14 @@ import sys
 import time
 from urllib.parse import urlsplit, urlunsplit
 
+from .wrap_adapters import (
+    copilot_provider_hint,
+    cursor_setup_lines,
+    inspect_openclaw_provider,
+    prepare_copilot_env,
+    prepare_openclaw_env,
+)
+
 
 @dataclass(frozen=True)
 class ProviderDefaults:
@@ -69,11 +77,15 @@ class WrapPlan:
     port: int
     argv: tuple[str, ...]
     provider_source: str = "explicit"
+    host_adapter: str = "generic"
+    host_provider_type: str | None = None
 
     @property
     def local_base_url(self) -> str:
         """Return the provider-compatible local proxy base URL."""
         base = f"http://{self.bind}:{self.port}"
+        if self.host_adapter == "copilot" and self.host_provider_type == "azure":
+            return base
         return base + "/v1" if self.provider == "openai" else base
 
     def to_dict(self) -> dict:
@@ -83,6 +95,8 @@ class WrapPlan:
             "executable": self.executable,
             "provider": self.provider,
             "provider_source": self.provider_source,
+            "host_adapter": self.host_adapter,
+            "host_provider_type": self.host_provider_type,
             "upstream": self.upstream,
             "base_url_env": self.base_url_env,
             "local_base_url": self.local_base_url,
@@ -154,7 +168,22 @@ def infer_wrap_provider(
     closed and ask the caller to pass an explicit provider.
     """
     environ = dict(os.environ if env is None else env)
-    preset = PRESETS.get(_agent_key(agent))
+    agent_key = _agent_key(agent)
+    preset = PRESETS.get(agent_key)
+    if agent_key == "copilot":
+        hinted, _ = copilot_provider_hint(agent_args, environ)
+        if hinted is not None:
+            return hinted, "copilot"
+    if agent_key in {"cursor", "cursor-agent"}:
+        return "openai", "cursor-byok"
+    if agent_key == "openclaw":
+        executable = shutil.which(agent) or (
+            agent if Path(agent).is_file() else None
+        )
+        if executable is None:
+            raise FileNotFoundError("agent executable not found: openclaw")
+        provider, _ = inspect_openclaw_provider(executable, env=environ)
+        return provider, "openclaw-model"
     if preset is not None:
         return preset.provider, "preset"
 
@@ -217,10 +246,13 @@ def build_wrap_plan(
     executable: str | None = None,
     env: dict[str, str] | None = None,
 ) -> WrapPlan:
-    """Build a wrapper plan without launching a provider or child process."""
+    """Build a wrapper plan without launching a provider proxy or interactive child."""
     environ = dict(os.environ if env is None else env)
     agent_key = _agent_key(agent)
     preset = PRESETS.get(agent_key)
+    copilot_wire_type = None
+    if agent_key == "copilot":
+        _, copilot_wire_type = copilot_provider_hint(agent_args, environ)
 
     if provider is None:
         selected_provider, provider_source = infer_wrap_provider(
@@ -237,7 +269,33 @@ def build_wrap_plan(
         )
 
     defaults = PROVIDERS[selected_provider]
-    selected_env = base_url_env or defaults.base_url_env
+    host_adapter = (
+        "copilot"
+        if agent_key == "copilot"
+        else "cursor-manual"
+        if agent_key in {"cursor", "cursor-agent"}
+        else "openclaw"
+        if agent_key == "openclaw"
+        else "generic"
+    )
+    if host_adapter == "copilot" and selected_provider == "gemini":
+        raise ValueError(
+            "Copilot CLI custom-provider mode documents OpenAI-compatible/Azure "
+            "and Anthropic providers, not Gemini"
+        )
+    if host_adapter == "cursor-manual" and selected_provider != "openai":
+        raise ValueError(
+            "Cursor's documented custom base-URL override is currently the "
+            "OpenAI BYOK path"
+        )
+    selected_env = (
+        base_url_env
+        or (
+            "COPILOT_PROVIDER_BASE_URL"
+            if host_adapter == "copilot"
+            else defaults.base_url_env
+        )
+    )
     existing_base = environ.get(selected_env, "")
     selected_upstream = upstream or _upstream_from_existing_base(
         selected_provider,
@@ -258,6 +316,12 @@ def build_wrap_plan(
         executable=selected_executable,
         provider=selected_provider,
         provider_source=provider_source,
+        host_adapter=host_adapter,
+        host_provider_type=(
+            copilot_wire_type
+            or ("anthropic" if host_adapter == "copilot" and selected_provider == "anthropic" else None)
+            or ("openai" if host_adapter == "copilot" and selected_provider == "openai" else None)
+        ),
         upstream=selected_upstream,
         base_url_env=selected_env,
         bind=bind,
@@ -302,13 +366,92 @@ def _provider_proxy_argv(root: Path, plan: WrapPlan, model_routing: str) -> list
     ]
 
 
-def _child_env(plan: WrapPlan, proxy_url: str | None = None) -> dict[str, str]:
-    """Return the child environment with only the selected provider redirected."""
+def _child_env(
+    plan: WrapPlan,
+    proxy_url: str | None = None,
+    *,
+    executable: str | None = None,
+) -> tuple[dict[str, str], tuple[Path, ...]]:
+    """Return host-aware child environment and temporary artifacts."""
     env = os.environ.copy()
-    env[plan.base_url_env] = proxy_url or plan.local_base_url
+    target = proxy_url or plan.local_base_url
+    cleanup: tuple[Path, ...] = ()
+    if plan.host_adapter == "copilot":
+        env = prepare_copilot_env(
+            env,
+            provider=plan.provider,
+            proxy_url=target,
+            args=plan.argv,
+        )
+    elif plan.host_adapter == "openclaw":
+        if executable is None:
+            raise ValueError("OpenClaw wrap requires a resolved executable")
+        prepared = prepare_openclaw_env(
+            executable,
+            env,
+            provider=plan.provider,
+            proxy_url=target,
+        )
+        env = prepared.env
+        cleanup = prepared.cleanup_paths
+    elif plan.host_adapter != "cursor-manual":
+        env[plan.base_url_env] = target
     env["ACCO_WRAPPED"] = "1"
     env["ACCO_WRAP_PROVIDER"] = plan.provider
-    return env
+    return env, cleanup
+
+
+def _cleanup_wrap_paths(paths: tuple[Path, ...]) -> None:
+    """Remove only temporary files created by the current wrap session."""
+    for path in paths:
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
+def _stop_proxy(proxy: subprocess.Popen) -> None:
+    """Terminate one ephemeral proxy process without leaking it on child exit."""
+    if proxy.poll() is not None:
+        return
+    proxy.terminate()
+    try:
+        proxy.wait(timeout=2)
+    except subprocess.TimeoutExpired:
+        proxy.kill()
+        proxy.wait(timeout=2)
+
+
+def _run_cursor_manual(
+    root: Path,
+    plan: WrapPlan,
+    *,
+    model_routing: str,
+    proxy_url: str | None,
+) -> int:
+    """Run Cursor's documented manual BYOK bridge without private-state edits."""
+    if plan.argv:
+        raise ValueError(
+            "Cursor manual BYOK bridge does not launch Cursor; child arguments "
+            "after -- are unsupported"
+        )
+    target = proxy_url or plan.local_base_url
+    lines = cursor_setup_lines(target, plan.provider)
+    if proxy_url:
+        print("\n".join(lines))
+        return 0
+
+    proxy = subprocess.Popen(_provider_proxy_argv(root, plan, model_routing))
+    try:
+        _wait_for_proxy(plan.bind, plan.port)
+        print("\n".join(lines))
+        print("Press Ctrl-C to stop the ACCO proxy session.")
+        try:
+            return int(proxy.wait())
+        except KeyboardInterrupt:
+            return 0
+    finally:
+        _stop_proxy(proxy)
 
 
 def run_wrap(
@@ -322,34 +465,44 @@ def run_wrap(
     if os.environ.get("ACCO_WRAPPED") == "1":
         raise RuntimeError("nested acco wrap detected; launch the child command directly")
 
+    if plan.host_adapter == "cursor-manual":
+        return _run_cursor_manual(
+            root,
+            plan,
+            model_routing=model_routing,
+            proxy_url=proxy_url,
+        )
+
     executable = shutil.which(plan.executable)
     if executable is None:
         raise FileNotFoundError(f"agent executable not found: {plan.executable}")
 
     if proxy_url:
-        completed = subprocess.run(
-            [executable, *plan.argv],
-            env=_child_env(plan, proxy_url),
-            cwd=root,
-            check=False,
-        )
-        return int(completed.returncode)
+        env, cleanup = _child_env(plan, proxy_url, executable=executable)
+        try:
+            completed = subprocess.run(
+                [executable, *plan.argv],
+                env=env,
+                cwd=root,
+                check=False,
+            )
+            return int(completed.returncode)
+        finally:
+            _cleanup_wrap_paths(cleanup)
 
     proxy_argv = _provider_proxy_argv(root, plan, model_routing)
     proxy = subprocess.Popen(proxy_argv)
+    cleanup: tuple[Path, ...] = ()
     try:
         _wait_for_proxy(plan.bind, plan.port)
+        env, cleanup = _child_env(plan, executable=executable)
         completed = subprocess.run(
             [executable, *plan.argv],
-            env=_child_env(plan),
+            env=env,
             cwd=root,
             check=False,
         )
         return int(completed.returncode)
     finally:
-        proxy.terminate()
-        try:
-            proxy.wait(timeout=2)
-        except subprocess.TimeoutExpired:
-            proxy.kill()
-            proxy.wait(timeout=2)
+        _cleanup_wrap_paths(cleanup)
+        _stop_proxy(proxy)
