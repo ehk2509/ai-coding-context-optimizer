@@ -246,7 +246,12 @@ def test_install_two_provider_profiles_and_uninstall_transactionally(
     assert sum(
         1
         for argv in service_calls
-        if argv[:4] == ["systemctl", "--user", "enable", "--now"]
+        if argv[:3] == ["systemctl", "--user", "enable"]
+    ) == 2
+    assert sum(
+        1
+        for argv in service_calls
+        if argv[:3] == ["systemctl", "--user", "restart"]
     ) == 2
 
     removed = uninstall_persistent_profiles(
@@ -285,7 +290,7 @@ def test_install_rolls_back_first_provider_when_second_service_fails(
 
     def runner(argv, **kwargs):
         nonlocal enable_count
-        if argv[:4] == ["systemctl", "--user", "enable", "--now"]:
+        if argv[:3] == ["systemctl", "--user", "restart"]:
             enable_count += 1
             if enable_count == 2:
                 raise subprocess.CalledProcessError(
