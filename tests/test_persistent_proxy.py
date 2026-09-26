@@ -406,3 +406,19 @@ def test_uninstall_refuses_dangling_codex_local_route(tmp_path, monkeypatch):
 
     assert profiles_for_root(root) == (profile,)
     assert profile.local_base_url in config.read_text(encoding="utf-8")
+
+
+def test_codex_attachment_refuses_invalid_existing_toml(tmp_path):
+    """Persistent routing must not write through an already-invalid Codex config."""
+    root = tmp_path / "repo"
+    home = tmp_path / "home"
+    root.mkdir()
+    config = root / ".codex" / "config.toml"
+    config.parent.mkdir(parents=True)
+    config.write_text("[features\ninvalid = true\n", encoding="utf-8")
+    before = config.read_text(encoding="utf-8")
+
+    with pytest.raises(ValueError, match="invalid Codex TOML"):
+        attach_codex(_profile(root, "openai", 19032, "codex"), home=home)
+
+    assert config.read_text(encoding="utf-8") == before
