@@ -142,13 +142,15 @@ ACCO now exposes six low-friction surfaces around the retrieval core:
 ```bash
 acco guardian .
 acco wrap claude
+acco wrap aider -- --model gpt-4.1
+OPENAI_API_KEY=... acco wrap opencode
 acco lean-skill . --install --host all
 acco context-audit .
 acco statusline .
 ```
 
 Claude integrations capture a bounded structured checkpoint before compaction,
-`wrap` can launch Claude/Codex/Gemini through the loopback provider boundary,
+`wrap` can launch Claude/Codex/Gemini or infer the provider for arbitrary provider-aware CLIs through the loopback provider boundary,
 the portable Lean skill constrains final prose without reducing verification,
 unknown tool outputs can fall back to payload-aware JSON/diff/log/table
 processors, the context auditor covers cross-host instruction bloat, and the
