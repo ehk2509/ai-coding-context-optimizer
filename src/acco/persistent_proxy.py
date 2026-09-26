@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 import hashlib
 import json
@@ -15,7 +16,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from typing import Any, Callable
+from typing import Any
 from urllib.parse import urlparse
 from urllib.request import urlopen
 from xml.sax.saxutils import escape
@@ -28,6 +29,7 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10
 from .config import update_json
 from .install import settings_path as claude_settings_path
 from .provider_proxy import ProviderProxyConfig, run_provider_proxy
+from .runtime_config import settings_for
 from .state import state_dir
 from .wrapper import PROVIDERS
 
@@ -953,16 +955,24 @@ def persistent_status(root: Path) -> dict[str, Any]:
 
 
 def run_profile(profile_id: str) -> int:
-    """Run one stored profile in the foreground for the native supervisor."""
+    """Run one stored profile with the same project settings as provider-proxy."""
     profile = load_profile(profile_id)
-    run_provider_proxy(
-        ProviderProxyConfig(
-            root=Path(profile.root),
-            upstream=profile.upstream,
-            provider=profile.provider,
-            bind="127.0.0.1",
-            port=profile.port,
-            instance_id=_runtime_instance_id(profile),
-        )
-    )
+    root = Path(profile.root)
+    settings = settings_for(root)
+    config = ProviderProxyConfig(
+        root=root,
+        upstream=profile.upstream,
+        provider=profile.provider,
+        bind="127.0.0.1",
+        port=profile.port,
+        deduplicate_history=settings.provider_history_dedup,
+        prefix_tracking=settings.prefix_tracking,
+        model_routing_mode=settings.provider_model_routing_mode,
+        model_routing_calibration_file=(
+            settings.provider_model_routing_calibration_file
+        ),
+        model_routing_min_savings=settings.provider_model_routing_min_savings,
+        instance_id=_runtime_instance_id(profile),
+    ).validate()
+    run_provider_proxy(config)
     return 0
