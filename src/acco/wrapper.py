@@ -76,6 +76,7 @@ class WrapPlan:
     port: int
     argv: tuple[str, ...]
     provider_source: str = "explicit"
+    host_adapter: str = "generic"
 
     @property
     def local_base_url(self) -> str:
@@ -90,6 +91,7 @@ class WrapPlan:
             "executable": self.executable,
             "provider": self.provider,
             "provider_source": self.provider_source,
+            "host_adapter": self.host_adapter,
             "upstream": self.upstream,
             "base_url_env": self.base_url_env,
             "local_base_url": self.local_base_url,
@@ -161,7 +163,14 @@ def infer_wrap_provider(
     closed and ask the caller to pass an explicit provider.
     """
     environ = dict(os.environ if env is None else env)
-    preset = PRESETS.get(_agent_key(agent))
+    agent_key = _agent_key(agent)
+    preset = PRESETS.get(agent_key)
+    if agent_key == "copilot":
+        hinted, _ = copilot_provider_hint(agent_args, environ)
+        if hinted is not None:
+            return hinted, "copilot"
+    if agent_key in {"cursor", "cursor-agent"}:
+        return "openai", "cursor-byok"
     if preset is not None:
         return preset.provider, "preset"
 
@@ -244,7 +253,19 @@ def build_wrap_plan(
         )
 
     defaults = PROVIDERS[selected_provider]
-    selected_env = base_url_env or defaults.base_url_env
+    host_adapter = (
+        "copilot"
+        if agent_key == "copilot"
+        else "cursor-manual"
+        if agent_key in {"cursor", "cursor-agent"}
+        else "openclaw"
+        if agent_key == "openclaw"
+        else "generic"
+    )
+    selected_env = (
+        base_url_env
+        or ("COPILOT_PROVIDER_BASE_URL" if host_adapter == "copilot" else defaults.base_url_env)
+    )
     existing_base = environ.get(selected_env, "")
     selected_upstream = upstream or _upstream_from_existing_base(
         selected_provider,
@@ -265,6 +286,7 @@ def build_wrap_plan(
         executable=selected_executable,
         provider=selected_provider,
         provider_source=provider_source,
+        host_adapter=host_adapter,
         upstream=selected_upstream,
         base_url_env=selected_env,
         bind=bind,
