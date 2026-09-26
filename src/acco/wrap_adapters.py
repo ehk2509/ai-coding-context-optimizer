@@ -62,6 +62,7 @@ def prepare_copilot_env(
     *,
     provider: str,
     proxy_url: str,
+    args: tuple[str, ...] = (),
 ) -> dict[str, str]:
     """Route Copilot CLI BYOK traffic through ACCO using documented env vars."""
     env = dict(base_env)
@@ -87,6 +88,14 @@ def prepare_copilot_env(
             env["COPILOT_PROVIDER_API_KEY"] = source_key
 
     model_present = bool(str(env.get("COPILOT_MODEL", "")).strip())
+    if not model_present:
+        for index, item in enumerate(args):
+            if item.startswith("--model="):
+                model_present = bool(item.split("=", 1)[1].strip())
+                break
+            if item in {"--model", "-m"} and index + 1 < len(args):
+                model_present = bool(str(args[index + 1]).strip())
+                break
     if not model_present:
         raise ValueError(
             "Copilot CLI custom-provider mode requires COPILOT_MODEL or --model; "
