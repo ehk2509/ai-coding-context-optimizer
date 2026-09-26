@@ -85,8 +85,11 @@ BYOK path; the bridge targets Cursor Chat/Agent provider traffic.
 
 ### OpenClaw
 
-For direct API routes `openai/*`, `anthropic/*`, and `google/*`, ACCO can
-wrap OpenClaw without modifying the real `openclaw.json`:
+ACCO reads OpenClaw's active configured model first, so that model choice can
+disambiguate shells containing several provider API keys. For direct API routes
+`anthropic/*` and `google/*`, and for `openai/*` routes whose model metadata
+already pins `agentRuntime.id=openclaw`, ACCO can wrap OpenClaw without modifying
+the real `openclaw.json`:
 
 1. read the active model with OpenClaw's documented `config get ... --json`;
 2. read the matching catalog row with `models list --provider ... --json`;
@@ -100,6 +103,13 @@ ACCO copies catalog metadata instead of inventing context-window or modality
 values. Direct API keys stay in process environment. OAuth/native/custom
 provider routes such as `openai-codex/*` are refused rather than converted to
 a guessed API-key transport.
+
+OpenClaw can choose an implicit Codex runtime only for exact official OpenAI
+Responses/ChatGPT routes with no authored request override. Because routing
+through ACCO necessarily creates a custom endpoint, an `openai/*` model whose
+runtime is unset/auto is refused: ACCO will not silently turn a possibly-Codex
+turn into an OpenClaw-runtime turn. Pin the model to
+`agentRuntime.id=openclaw` first when that runtime is intentionally desired.
 
 ## Arguments and options
 
