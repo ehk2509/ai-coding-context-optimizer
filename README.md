@@ -65,6 +65,10 @@ a repair/migration step. Configure hosts explicitly when needed:
 ```bash
 acco setup . --host claude --host cursor
 acco setup . --host all
+
+# Optional: keep provider interception active across future Claude/Codex sessions.
+acco proxy install . --host claude --host codex
+acco proxy status .
 ```
 
 `doctor` consolidates CLI, project-config, host-integration, repository-index,
@@ -147,6 +151,7 @@ OPENAI_API_KEY=... acco wrap opencode
 COPILOT_PROVIDER_TYPE=anthropic COPILOT_MODEL=claude-sonnet-5 acco wrap copilot
 acco wrap cursor --provider openai
 OPENAI_API_KEY=... acco wrap openclaw
+acco proxy install . --host claude --host codex
 acco lean-skill . --install --host all
 acco context-audit .
 acco statusline .
@@ -154,7 +159,8 @@ acco statusline .
 
 Claude integrations capture a bounded structured checkpoint before compaction,
 `wrap` can launch Claude/Codex/Gemini or infer the provider for arbitrary provider-aware CLIs through the loopback provider boundary,
-Copilot CLI has a documented BYOK-env adapter, OpenClaw direct API routes use
+Persistent proxy profiles can auto-start at user login and attach Claude/Codex
+without requiring acco wrap on each launch. Copilot CLI has a documented BYOK-env adapter, OpenClaw direct API routes use
 a temporary config overlay, and Cursor uses a safe manual BYOK bridge rather
 than undocumented private-state edits. The portable Lean skill constrains final prose without reducing verification,
 unknown tool outputs can fall back to payload-aware JSON/diff/log/table
