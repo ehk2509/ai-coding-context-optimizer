@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -193,7 +194,10 @@ def proxy_run_main(argv: list[str]) -> int:
     """Run one stored persistent profile for an OS-native user supervisor."""
     parser = argparse.ArgumentParser(prog="acco proxy-run")
     parser.add_argument("profile_id")
+    parser.add_argument("--state-dir")
     args = parser.parse_args(argv)
+    if args.state_dir:
+        os.environ["ACCO_STATE_DIR"] = args.state_dir
     try:
         return run_profile(args.profile_id)
     except (OSError, ValueError, RuntimeError) as exc:
