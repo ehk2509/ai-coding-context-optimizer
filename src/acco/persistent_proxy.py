@@ -20,6 +20,11 @@ from urllib.parse import urlparse
 from urllib.request import urlopen
 from xml.sax.saxutils import escape
 
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - Python 3.10
+    import tomli as tomllib
+
 from .config import update_json
 from .install import settings_path as claude_settings_path
 from .provider_proxy import ProviderProxyConfig, run_provider_proxy
@@ -625,6 +630,18 @@ def _codex_chatgpt_auth(path: Path) -> bool:
     )
 
 
+def _validate_codex_toml(text: str, path: Path) -> None:
+    """Reject invalid Codex TOML before or after ACCO's owned mutation."""
+    if not text.strip():
+        return
+    try:
+        parsed = tomllib.loads(text)
+    except tomllib.TOMLDecodeError as exc:
+        raise ValueError(f"refusing invalid Codex TOML: {path}") from exc
+    if not isinstance(parsed, dict):
+        raise ValueError(f"expected Codex TOML document: {path}")
+
+
 def _root_toml_conflicts(text: str) -> tuple[str, ...]:
     """Return provider-routing root keys outside TOML tables."""
     first_table = re.search(r"(?m)^[ \t]*\[", text)
@@ -643,6 +660,7 @@ def attach_codex(profile: PersistentProxyProfile, *, home: Path | None = None) -
     home = home or Path.home()
     path = Path(profile.root) / ".codex" / "config.toml"
     text = path.read_text(encoding="utf-8") if path.exists() else ""
+    _validate_codex_toml(text, path)
     start_marker, end_marker = _codex_markers(profile.profile_id)
     if (start_marker in text) != (end_marker in text):
         raise ValueError("ACCO persistent Codex block is incomplete")
@@ -678,6 +696,7 @@ def attach_codex(profile: PersistentProxyProfile, *, home: Path | None = None) -
     rendered = (root_text + "\n\n" if root_text else "") + block
     if tables:
         rendered += "\n" + tables.rstrip() + "\n"
+    _validate_codex_toml(rendered, path)
     _atomic_text(path, rendered)
 
 
