@@ -77,11 +77,14 @@ class WrapPlan:
     argv: tuple[str, ...]
     provider_source: str = "explicit"
     host_adapter: str = "generic"
+    host_provider_type: str | None = None
 
     @property
     def local_base_url(self) -> str:
         """Return the provider-compatible local proxy base URL."""
         base = f"http://{self.bind}:{self.port}"
+        if self.host_adapter == "copilot" and self.host_provider_type == "azure":
+            return base
         return base + "/v1" if self.provider == "openai" else base
 
     def to_dict(self) -> dict:
@@ -92,6 +95,7 @@ class WrapPlan:
             "provider": self.provider,
             "provider_source": self.provider_source,
             "host_adapter": self.host_adapter,
+            "host_provider_type": self.host_provider_type,
             "upstream": self.upstream,
             "base_url_env": self.base_url_env,
             "local_base_url": self.local_base_url,
@@ -237,6 +241,9 @@ def build_wrap_plan(
     environ = dict(os.environ if env is None else env)
     agent_key = _agent_key(agent)
     preset = PRESETS.get(agent_key)
+    copilot_wire_type = None
+    if agent_key == "copilot":
+        _, copilot_wire_type = copilot_provider_hint(agent_args, environ)
 
     if provider is None:
         selected_provider, provider_source = infer_wrap_provider(
@@ -287,6 +294,11 @@ def build_wrap_plan(
         provider=selected_provider,
         provider_source=provider_source,
         host_adapter=host_adapter,
+        host_provider_type=(
+            copilot_wire_type
+            or ("anthropic" if host_adapter == "copilot" and selected_provider == "anthropic" else None)
+            or ("openai" if host_adapter == "copilot" and selected_provider == "openai" else None)
+        ),
         upstream=selected_upstream,
         base_url_env=selected_env,
         bind=bind,
