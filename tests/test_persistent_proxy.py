@@ -178,7 +178,7 @@ def test_codex_attachment_preserves_unrelated_toml_and_oauth_mode(tmp_path):
     assert "[features]" in second
     assert "web_search = true" in second
     assert second.count("[model_providers.acco]") == 1
-    assert f'base_url = "http://127.0.0.1:19023/v1"' in second
+    assert 'base_url = "http://127.0.0.1:19023/v1"' in second
     assert "supports_websockets = false" in second
     assert "requires_openai_auth = true" in second
 
