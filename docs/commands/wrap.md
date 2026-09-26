@@ -17,6 +17,12 @@ acco wrap claude
 acco wrap codex -- --help
 acco wrap gemini
 
+# Host-specific adapters
+COPILOT_PROVIDER_TYPE=anthropic COPILOT_MODEL=claude-sonnet-5 \
+  acco wrap copilot
+acco wrap cursor --provider openai
+OPENAI_API_KEY=... acco wrap openclaw
+
 # Multi-provider / arbitrary CLIs: infer from the child model
 acco wrap aider -- --model gpt-4.1
 acco wrap aider -- --model claude-sonnet-4-5
@@ -48,8 +54,52 @@ silently chooses one API key from an ambiguous shell environment.
 
 This generic path works for CLIs that honor the standard provider base-URL
 environment variable ACCO injects. Tools that require proprietary config-file,
-plugin, or OAuth/BYOK rewrites still need a host-specific integration rather
-than pretending generic environment interception is sufficient.
+plugin, or OAuth/BYOK rewrites use host-specific adapters rather than pretending
+generic environment interception is sufficient.
+
+## Host-specific adapters
+
+### GitHub Copilot CLI
+
+Copilot CLI uses its documented BYOK environment contract. ACCO redirects
+`COPILOT_PROVIDER_BASE_URL`, preserves `COPILOT_PROVIDER_TYPE=azure` when
+present, and otherwise maps OpenAI-compatible and Anthropic provider types to the
+matching ACCO request transformer. `COPILOT_MODEL` or a child `--model` flag
+is required by Copilot's custom-provider mode.
+
+If `COPILOT_PROVIDER_API_KEY` is absent, ACCO can pass an existing
+`OPENAI_API_KEY` or `ANTHROPIC_API_KEY` into the child process only. It does
+not persist that credential.
+
+### Cursor
+
+Cursor exposes its OpenAI-compatible BYOK base URL through
+**Settings > Models > API Keys**, but does not publish a stable machine-writable
+provider-setting contract. `acco wrap cursor --provider openai` therefore
+starts the local ACCO proxy and prints the exact supported setting to enter.
+It deliberately does not edit Cursor's private databases or undocumented state.
+
+When `--proxy-url` is supplied, ACCO only prints the Cursor setup lines and
+reuses that already-running proxy. Cursor Tab completion remains outside this
+BYOK path; the bridge targets Cursor Chat/Agent provider traffic.
+
+### OpenClaw
+
+For direct API routes `openai/*`, `anthropic/*`, and `google/*`, ACCO can
+wrap OpenClaw without modifying the real `openclaw.json`:
+
+1. read the active model with OpenClaw's documented `config get ... --json`;
+2. read the matching catalog row with `models list --provider ... --json`;
+3. create a temporary sibling config whose root `$include` points at the real
+   config;
+4. add one temporary `acco-wrap` provider using the matching wire protocol;
+5. point only the child process at that file with `OPENCLAW_CONFIG_PATH`;
+6. remove the temporary file when the child exits.
+
+ACCO copies catalog metadata instead of inventing context-window or modality
+values. Direct API keys stay in process environment. OAuth/native/custom
+provider routes such as `openai-codex/*` are refused rather than converted to
+a guessed API-key transport.
 
 ## Arguments and options
 
