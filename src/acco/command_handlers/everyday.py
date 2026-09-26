@@ -38,9 +38,18 @@ def guardian_main(argv: list[str]) -> int:
 
 def wrap_main(argv: list[str]) -> int:
     """Launch one coding agent through an ephemeral ACCO provider proxy."""
-    parser = argparse.ArgumentParser(prog="acco wrap")
-    parser.add_argument("agent")
-    parser.add_argument("agent_args", nargs=argparse.REMAINDER)
+    parser = argparse.ArgumentParser(
+        prog="acco wrap",
+        description=(
+            "Launch a coding CLI through ACCO. Claude/Codex/Gemini are detected "
+            "by executable; other commands are inferred from --model or provider env."
+        ),
+        epilog=(
+            "examples: acco wrap claude | acco wrap aider -- --model gpt-4.1 | "
+            "acco wrap opencode | acco wrap --provider anthropic my-agent"
+        ),
+    )
+    parser.add_argument("agent", metavar="COMMAND")
     parser.add_argument("--path", default=".")
     parser.add_argument("--bind", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=0)
@@ -49,16 +58,27 @@ def wrap_main(argv: list[str]) -> int:
     parser.add_argument("--base-url-env")
     parser.add_argument("--executable")
     parser.add_argument(
+        "--proxy-url",
+        help=(
+            "reuse an already-running ACCO-compatible proxy instead of starting "
+            "an ephemeral provider proxy"
+        ),
+    )
+    parser.add_argument(
         "--model-routing",
         choices=("off", "observe", "calibrated"),
         default="off",
     )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--json", action="store_true")
-    args = parser.parse_args(argv)
-    trailing = list(args.agent_args)
-    if trailing and trailing[0] == "--":
-        trailing = trailing[1:]
+    if "--" in argv:
+        separator = argv.index("--")
+        wrapper_argv = argv[:separator]
+        trailing = argv[separator + 1 :]
+    else:
+        wrapper_argv = argv
+        trailing = []
+    args = parser.parse_args(wrapper_argv)
     try:
         plan = build_wrap_plan(
             args.agent,
@@ -73,6 +93,7 @@ def wrap_main(argv: list[str]) -> int:
         if args.dry_run:
             payload = plan.to_dict()
             payload["model_routing"] = args.model_routing
+            payload["proxy_url"] = args.proxy_url
             if args.json:
                 print(json.dumps(payload, indent=2))
             else:
@@ -85,6 +106,7 @@ def wrap_main(argv: list[str]) -> int:
             Path(args.path),
             plan,
             model_routing=args.model_routing,
+            proxy_url=args.proxy_url,
         )
     except (FileNotFoundError, OSError, RuntimeError, ValueError) as exc:
         print(str(exc), file=sys.stderr)
