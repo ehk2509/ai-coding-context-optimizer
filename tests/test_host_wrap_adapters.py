@@ -141,6 +141,7 @@ def test_openclaw_overlay_preserves_original_and_catalog_metadata(tmp_path, monk
                         "input": "text+image",
                         "contextWindow": 400000,
                         "maxTokens": 64000,
+                        "agentRuntime": {"id": "openclaw"},
                     }
                 ]
             }
@@ -169,6 +170,7 @@ def test_openclaw_overlay_preserves_original_and_catalog_metadata(tmp_path, monk
     assert provider["api"] == "openai-responses"
     assert provider["apiKey"] == "$" + "{ACCO_OPENCLAW_PROVIDER_KEY}"
     assert provider["models"][0]["contextWindow"] == 400000
+    assert provider["models"][0]["agentRuntime"] == {"id": "openclaw"}
     assert provider["models"][0]["input"] == ["text", "image"]
     assert overlay["agents"]["defaults"]["model"]["fallbacks"] == [
         "openai/gpt-5.6-luna"
@@ -225,3 +227,75 @@ def test_openclaw_run_removes_ephemeral_overlay(tmp_path, monkeypatch):
 
     assert code == 0
     assert not temp.exists()
+
+
+def test_openclaw_openai_without_explicit_runtime_fails_closed(tmp_path, monkeypatch):
+    """A custom proxy must not silently change OpenClaw's implicit runtime choice."""
+    home = tmp_path / "home"
+    (home / ".openclaw").mkdir(parents=True)
+
+    def fake_run_json(argv, *, env):
+        del env
+        if argv[1] == "config":
+            return "openai/gpt-5.6-sol"
+        return {
+            "models": [
+                {
+                    "key": "openai/gpt-5.6-sol",
+                    "name": "GPT-5.6 Sol",
+                    "contextWindow": 400000,
+                    "maxTokens": 64000,
+                }
+            ]
+        }
+
+    monkeypatch.setattr(wrap_adapters, "_run_json", fake_run_json)
+    with pytest.raises(ValueError, match="implicit Codex/OpenClaw"):
+        prepare_openclaw_env(
+            "openclaw",
+            {"HOME": str(home), "OPENAI_API_KEY": "secret"},
+            provider="openai",
+            proxy_url="http://127.0.0.1:8787/v1",
+        )
+
+
+def test_openclaw_provider_inference_uses_active_model_before_ambiguous_keys(monkeypatch):
+    """Host model selection should disambiguate shells containing several API keys."""
+    monkeypatch.setattr("acco.wrapper.shutil.which", lambda _value: "/bin/openclaw")
+    monkeypatch.setattr(
+        "acco.wrapper.inspect_openclaw_provider",
+        lambda _executable, *, env: ("anthropic", "anthropic/claude-sonnet-5"),
+    )
+
+    plan = build_wrap_plan(
+        "openclaw",
+        [],
+        port=19106,
+        env={
+            "OPENAI_API_KEY": "one",
+            "ANTHROPIC_API_KEY": "two",
+        },
+    )
+
+    assert plan.provider == "anthropic"
+    assert plan.provider_source == "openclaw-model"
+    assert plan.host_adapter == "openclaw"
+
+
+def test_cursor_manual_bridge_rejects_child_args(tmp_path, monkeypatch):
+    """Cursor setup-only mode must not silently discard pass-through arguments."""
+    monkeypatch.delenv("ACCO_WRAPPED", raising=False)
+    plan = build_wrap_plan(
+        "cursor",
+        ["--some-cursor-flag"],
+        provider="openai",
+        port=19107,
+        env={},
+    )
+
+    with pytest.raises(ValueError, match="child arguments"):
+        run_wrap(
+            Path(tmp_path),
+            plan,
+            proxy_url="http://127.0.0.1:8787/v1",
+        )
