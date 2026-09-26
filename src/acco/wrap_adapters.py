@@ -340,7 +340,7 @@ def prepare_openclaw_env(
         "providers": {
             "acco-wrap": {
                 "baseUrl": proxy_url,
-                "apiKey": "\${ACCO_OPENCLAW_PROVIDER_KEY}",
+                "apiKey": "${ACCO_OPENCLAW_PROVIDER_KEY}",
                 "api": api,
                 "models": [model_entry],
             }
