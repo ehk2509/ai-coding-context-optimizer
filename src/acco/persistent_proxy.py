@@ -225,11 +225,11 @@ def profiles_for_root(root: Path) -> tuple[PersistentProxyProfile, ...]:
 def _resolve_acco_command() -> list[str]:
     """Return an absolute command suitable for an OS service definition."""
     if getattr(sys, "frozen", False):
-        return [str(Path(sys.executable).resolve())]
+        return [str(Path(sys.executable).absolute())]
     executable = shutil.which("acco")
     if executable:
-        return [str(Path(executable).resolve())]
-    return [str(Path(sys.executable).resolve()), "-m", "acco.entry"]
+        return [str(Path(executable).absolute())]
+    return [str(Path(sys.executable).absolute()), "-m", "acco.entry"]
 
 
 def _service_command(profile_id: str) -> list[str]:
