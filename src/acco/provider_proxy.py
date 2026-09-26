@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import hashlib
 import ipaddress
 import json
 from pathlib import Path
@@ -51,6 +52,7 @@ class ProviderProxyConfig:
     model_routing_mode: str = "off"
     model_routing_calibration_file: str = ".acco.routing-calibration.json"
     model_routing_min_savings: float = 0.05
+    instance_id: str = ""
 
     def validate(self) -> ProviderProxyConfig:
         """Reject unsafe binding/upstream combinations before serving."""
@@ -204,6 +206,32 @@ def _handler_factory(
                 file=sys.stderr,
             )
 
+        def _health(self) -> None:
+            """Return content-free local identity for persistent readiness checks."""
+            payload = json.dumps(
+                {
+                    "ok": True,
+                    "provider": config.provider,
+                    "instance_id": config.instance_id,
+                    "root_fingerprint": hashlib.sha256(
+                        str(config.root.resolve()).encode()
+                    ).hexdigest()[:16],
+                },
+                separators=(",", ":"),
+            ).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+
+        def _dispatch(self) -> None:
+            """Serve ACCO health locally or forward the provider request."""
+            if self.command == "GET" and self.path == "/__acco/health":
+                self._health()
+                return
+            self._proxy()
+
         def _proxy(self) -> None:
             """Transform one supported request and stream the upstream response."""
             length_header = self.headers.get("Content-Length")
@@ -320,13 +348,13 @@ def _handler_factory(
                     file=sys.stderr,
                 )
 
-        do_POST = _proxy
-        do_PUT = _proxy
-        do_PATCH = _proxy
-        do_GET = _proxy
-        do_DELETE = _proxy
-        do_OPTIONS = _proxy
-        do_HEAD = _proxy
+        do_POST = _dispatch
+        do_PUT = _dispatch
+        do_PATCH = _dispatch
+        do_GET = _dispatch
+        do_DELETE = _dispatch
+        do_OPTIONS = _dispatch
+        do_HEAD = _dispatch
 
     return Handler
 
