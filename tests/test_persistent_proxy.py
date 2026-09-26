@@ -587,3 +587,25 @@ def test_new_profile_allocator_skips_reserved_stopped_port(tmp_path, monkeypatch
     monkeypatch.setattr(persistent_proxy.socket, "socket", lambda *_a, **_k: FakeSocket())
 
     assert persistent_proxy._free_port(excluded={19036}) == 19037
+
+
+def test_service_command_preserves_stable_launcher_symlink(tmp_path, monkeypatch):
+    """Persistent services should survive package upgrades that retarget a launcher."""
+    if persistent_proxy.os.name == "nt":
+        pytest.skip("symlink creation is not reliably available on Windows CI")
+    target = tmp_path / "versions" / "acco-1.20"
+    target.parent.mkdir()
+    target.write_text("#!/bin/sh\n", encoding="utf-8")
+    launcher = tmp_path / "bin" / "acco"
+    launcher.parent.mkdir()
+    launcher.symlink_to(target)
+    monkeypatch.setattr(
+        persistent_proxy.shutil,
+        "which",
+        lambda _name: str(launcher),
+    )
+
+    command = persistent_proxy._resolve_acco_command()
+
+    assert command == [str(launcher.absolute())]
+    assert command[0] != str(target.resolve())
