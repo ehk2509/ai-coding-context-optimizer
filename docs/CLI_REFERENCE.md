@@ -39,6 +39,7 @@ For machine-readable fields, see [Machine-readable CLI contracts](JSON_OUTPUTS.m
 - [`sdk-serve`](commands/sdk-serve.md) — run the loopback SDK bridge for TypeScript and other custom agents.
 - [`install`](commands/install.md) — legacy/low-level Claude hook installer.
 - [`wrap`](commands/wrap.md) — zero-config launch for known or inferable coding CLIs through an ephemeral/existing ACCO provider proxy.
+- [`proxy`](commands/proxy.md) — install/manage persistent background provider proxies with durable Claude/Codex attachment.
 - [`claude`](commands/claude.md) — launch Claude Code through the ACCO provider wrapper.
 - [`codex`](commands/codex.md) — launch Codex through the ACCO provider wrapper.
 - [`gemini`](commands/gemini.md) — launch Gemini CLI through the ACCO provider wrapper.
