@@ -191,7 +191,13 @@ def _resolve_acco_command() -> list[str]:
 
 def _service_command(profile_id: str) -> list[str]:
     """Return the credential-free foreground runner command."""
-    return [*_resolve_acco_command(), "proxy-run", profile_id]
+    return [
+        *_resolve_acco_command(),
+        "proxy-run",
+        profile_id,
+        "--state-dir",
+        str(state_dir().resolve()),
+    ]
 
 
 def _service_kind(platform: str | None = None) -> str:
