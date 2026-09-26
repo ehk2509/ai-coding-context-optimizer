@@ -596,7 +596,7 @@ def attach_codex(profile: PersistentProxyProfile, *, home: Path | None = None) -
     if profile.provider != "openai":
         raise ValueError("Codex persistent attachment requires an OpenAI profile")
     home = home or Path.home()
-    path = home / ".codex" / "config.toml"
+    path = Path(profile.root) / ".codex" / "config.toml"
     text = path.read_text(encoding="utf-8") if path.exists() else ""
     start_marker, end_marker = _codex_markers(profile.profile_id)
     if (start_marker in text) != (end_marker in text):
@@ -626,7 +626,7 @@ def attach_codex(profile: PersistentProxyProfile, *, home: Path | None = None) -
         "[model_providers.acco]\n"
         'name = "ACCO persistent proxy"\n'
         f'base_url = "{profile.local_base_url}"\n'
-        "supports_websockets = true\n"
+        "supports_websockets = false\n"
         f"{auth_line}"
         f"{end_marker}\n"
     )
@@ -638,7 +638,8 @@ def attach_codex(profile: PersistentProxyProfile, *, home: Path | None = None) -
 
 def detach_codex(profile: PersistentProxyProfile, *, home: Path | None = None) -> None:
     """Remove only the marked persistent Codex provider block."""
-    path = (home or Path.home()) / ".codex" / "config.toml"
+    del home
+    path = Path(profile.root) / ".codex" / "config.toml"
     if not path.exists():
         return
     text = path.read_text(encoding="utf-8")
