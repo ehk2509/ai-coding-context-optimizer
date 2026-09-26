@@ -15,6 +15,7 @@ from urllib.parse import urlsplit, urlunsplit
 from .wrap_adapters import (
     copilot_provider_hint,
     cursor_setup_lines,
+    inspect_openclaw_provider,
     prepare_copilot_env,
     prepare_openclaw_env,
 )
@@ -175,6 +176,14 @@ def infer_wrap_provider(
             return hinted, "copilot"
     if agent_key in {"cursor", "cursor-agent"}:
         return "openai", "cursor-byok"
+    if agent_key == "openclaw":
+        executable = shutil.which(agent) or (
+            agent if Path(agent).is_file() else None
+        )
+        if executable is None:
+            raise FileNotFoundError("agent executable not found: openclaw")
+        provider, _ = inspect_openclaw_provider(executable, env=environ)
+        return provider, "openclaw-model"
     if preset is not None:
         return preset.provider, "preset"
 
@@ -237,7 +246,7 @@ def build_wrap_plan(
     executable: str | None = None,
     env: dict[str, str] | None = None,
 ) -> WrapPlan:
-    """Build a wrapper plan without launching a provider or child process."""
+    """Build a wrapper plan without launching a provider proxy or interactive child."""
     environ = dict(os.environ if env is None else env)
     agent_key = _agent_key(agent)
     preset = PRESETS.get(agent_key)
@@ -421,6 +430,11 @@ def _run_cursor_manual(
     proxy_url: str | None,
 ) -> int:
     """Run Cursor's documented manual BYOK bridge without private-state edits."""
+    if plan.argv:
+        raise ValueError(
+            "Cursor manual BYOK bridge does not launch Cursor; child arguments "
+            "after -- are unsupported"
+        )
     target = proxy_url or plan.local_base_url
     lines = cursor_setup_lines(target, plan.provider)
     if proxy_url:
