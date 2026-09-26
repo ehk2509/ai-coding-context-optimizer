@@ -1,10 +1,20 @@
-# acco proxy
+# `acco proxy`
 
 Install and manage persistent background ACCO provider proxies for a project.
 
 Unlike acco wrap, which owns one foreground agent launch, acco proxy install
 creates stable loopback listeners that start automatically with the current user
 session and attaches supported hosts to those listeners.
+
+## Synopsis
+
+```bash
+acco proxy install [PATH] [--host claude|codex|all]...
+acco proxy status [PATH] [--json]
+acco proxy start [PATH]
+acco proxy stop [PATH]
+acco proxy uninstall [PATH] [--json]
+```
 
 ## Quick start
 
@@ -98,7 +108,7 @@ or host attachment fails, ACCO rolls back profiles created earlier in that same
 operation. Reconfiguration of an existing profile keeps its previous manifest
 available for restoration.
 
-## Commands
+## Arguments and options
 
 ### acco proxy install [PATH]
 
@@ -132,3 +142,29 @@ automatically in future sessions. Use acco wrap for temporary sessions, hosts
 without a safe persistent adapter, or ambiguous/user-managed provider configuration.
 
 The two paths use the same production provider transformation engine.
+
+## Exit codes
+
+- `0` — lifecycle action completed successfully.
+- `2` — invalid provider/port/upstream, unsupported host, unsafe host-config
+  ownership, invalid project configuration, missing profile, supervisor failure,
+  or verified proxy readiness failure.
+- `proxy-run` is an internal supervisor entry point and is intentionally absent
+  from normal command discovery.
+
+## Output contract
+
+`install --json` returns the resolved project root, attached hosts, and the
+credential-free provider profile records including stable local base URLs and
+supervisor metadata. `status --json` adds verified `running` and
+`artifact_exists` state. `uninstall --json` returns the project root and
+removed profile ids.
+
+Human-readable output never prints API keys, provider authorization headers,
+prompts, tool output, or source content.
+
+## Authoritative runtime help
+
+Run `acco proxy --help` and `acco proxy <subcommand> --help` for the shipped
+runtime arguments. The internal `proxy-run` command is reserved for native
+supervisors and is not part of the public CLI surface.
