@@ -64,9 +64,11 @@ installation fails closed. ACCO does not silently replace an existing gateway.
 
 ## Codex attachment
 
-For Codex, ACCO inserts one marked provider block in ~/.codex/config.toml.
-Unrelated root keys and tables are preserved. If Codex already has user-managed
-root model_provider or openai_base_url routing, ACCO refuses to replace it.
+For Codex, ACCO inserts one marked provider block in the project's .codex/config.toml.
+This keeps persistent routing scoped to the repository instead of changing every
+Codex session for the user. Unrelated root keys and tables are preserved. If the
+project config already has user-managed root model_provider or openai_base_url
+routing, ACCO refuses to replace it.
 
 When ~/.codex/auth.json reports ChatGPT authentication, the managed custom
 provider includes requires_openai_auth = true; API-key users do not receive
