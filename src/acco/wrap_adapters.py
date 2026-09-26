@@ -311,6 +311,15 @@ def prepare_openclaw_env(
     """Build an ephemeral OpenClaw config overlay that routes one direct provider."""
     env = dict(base_env)
     model_ref, current_model = _openclaw_primary_model(executable, env)
+    if isinstance(current_model, dict):
+        fallbacks = current_model.get("fallbacks")
+        if isinstance(fallbacks, list) and fallbacks:
+            raise ValueError(
+                "OpenClaw wrap refuses configured model fallbacks because those "
+                "routes would bypass ACCO after a primary failure; disable fallbacks "
+                "for the wrapped session or use a host integration that can proxy "
+                "every fallback route"
+            )
     provider_id = model_ref.split("/", 1)[0]
     detected_provider, api, key_names = _openclaw_provider_contract(provider_id)
     if provider != detected_provider:
