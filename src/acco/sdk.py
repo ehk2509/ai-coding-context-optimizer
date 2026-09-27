@@ -9,6 +9,11 @@ from typing import Any
 
 from .browser_context import compress_browser_payload
 from .context_router import route_context
+from .domain_middleware import (
+    optimize_api_payload,
+    optimize_database_rows,
+    optimize_rag_context,
+)
 from .estimate import estimate_tokens
 from .model_routing import route_task
 from .output import OutputPolicy, OutputPipeline
@@ -222,6 +227,57 @@ class AccoEngine:
             calibration=calibration,
         ).to_dict()
 
+    def optimize_rag(
+        self,
+        documents: list[Any],
+        *,
+        query: str = "",
+        max_documents: int = 8,
+        min_reduction: float = 0.08,
+    ) -> dict[str, Any]:
+        """Compress caller-supplied RAG documents for model context."""
+        return optimize_rag_context(
+            documents,
+            query=query,
+            recovery=self.recovery,
+            max_documents=max_documents,
+            min_reduction=min_reduction,
+        )
+
+    def optimize_api_payload(
+        self,
+        payload: Any,
+        *,
+        query: str = "",
+        min_reduction: float = 0.08,
+    ) -> dict[str, Any]:
+        """Compress caller-supplied JSON API data for model context."""
+        return optimize_api_payload(
+            payload,
+            query=query,
+            recovery=self.recovery,
+            min_reduction=min_reduction,
+        )
+
+    def optimize_database_rows(
+        self,
+        rows: list[Any],
+        *,
+        query: str = "",
+        columns: list[str] | None = None,
+        max_rows: int = 20,
+        min_reduction: float = 0.08,
+    ) -> dict[str, Any]:
+        """Compress caller-supplied query results without opening a database."""
+        return optimize_database_rows(
+            rows,
+            query=query,
+            recovery=self.recovery,
+            columns=columns,
+            max_rows=max_rows,
+            min_reduction=min_reduction,
+        )
+
     def recover(self, handle: str) -> dict[str, Any]:
         """Recover exact stored bytes using a content-addressed recovery handle."""
         record = self.recovery.get(handle)
@@ -248,6 +304,18 @@ class AccoEngine:
     def middleware(self, provider: str) -> AccoMiddleware:
         """Create a provider-bound middleware facade for a custom agent."""
         return AccoMiddleware(self, provider=provider)
+
+    def rag(self) -> AccoRagMiddleware:
+        """Create optional RAG-context middleware."""
+        return AccoRagMiddleware(self)
+
+    def api(self) -> AccoApiMiddleware:
+        """Create optional JSON API-payload middleware."""
+        return AccoApiMiddleware(self)
+
+    def database(self) -> AccoDatabaseMiddleware:
+        """Create optional database-result middleware."""
+        return AccoDatabaseMiddleware(self)
 
 
 class AccoMiddleware:
@@ -310,4 +378,89 @@ class AccoMiddleware:
 
     def recover(self, handle: str) -> dict[str, Any]:
         """Recover exact source bytes for a prior middleware transform."""
+        return self.engine.recover(handle)
+
+
+
+class AccoRagMiddleware:
+    """Optional adapter for already-retrieved RAG documents."""
+
+    def __init__(self, engine: AccoEngine):
+        """Bind the adapter to one project-scoped recovery store."""
+        self.engine = engine
+
+    def optimize(
+        self,
+        documents: list[Any],
+        *,
+        query: str = "",
+        max_documents: int = 8,
+        min_reduction: float = 0.08,
+    ) -> dict[str, Any]:
+        """Compress documents without performing retrieval or embedding calls."""
+        return self.engine.optimize_rag(
+            documents,
+            query=query,
+            max_documents=max_documents,
+            min_reduction=min_reduction,
+        )
+
+    def recover(self, handle: str) -> dict[str, Any]:
+        """Recover the exact canonical JSON submitted to the adapter."""
+        return self.engine.recover(handle)
+
+
+class AccoApiMiddleware:
+    """Optional adapter for caller-supplied JSON API payloads."""
+
+    def __init__(self, engine: AccoEngine):
+        """Bind the adapter to one project-scoped recovery store."""
+        self.engine = engine
+
+    def optimize(
+        self,
+        payload: Any,
+        *,
+        query: str = "",
+        min_reduction: float = 0.08,
+    ) -> dict[str, Any]:
+        """Compress JSON data for LLM context without making network requests."""
+        return self.engine.optimize_api_payload(
+            payload,
+            query=query,
+            min_reduction=min_reduction,
+        )
+
+    def recover(self, handle: str) -> dict[str, Any]:
+        """Recover the exact canonical JSON submitted to the adapter."""
+        return self.engine.recover(handle)
+
+
+class AccoDatabaseMiddleware:
+    """Optional adapter for caller-supplied database/query result rows."""
+
+    def __init__(self, engine: AccoEngine):
+        """Bind the adapter to one project-scoped recovery store."""
+        self.engine = engine
+
+    def optimize(
+        self,
+        rows: list[Any],
+        *,
+        query: str = "",
+        columns: list[str] | None = None,
+        max_rows: int = 20,
+        min_reduction: float = 0.08,
+    ) -> dict[str, Any]:
+        """Compress rows without opening a database connection or running SQL."""
+        return self.engine.optimize_database_rows(
+            rows,
+            query=query,
+            columns=columns,
+            max_rows=max_rows,
+            min_reduction=min_reduction,
+        )
+
+    def recover(self, handle: str) -> dict[str, Any]:
+        """Recover the exact canonical JSON submitted to the adapter."""
         return self.engine.recover(handle)
