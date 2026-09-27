@@ -61,6 +61,46 @@ export interface OutputOptimization {
   recovery_handle: string | null;
 }
 
+export interface StructuredOptimization {
+  schema: number;
+  domain: "rag" | "api" | "database";
+  format: "json";
+  value: unknown;
+  changed: boolean;
+  original_tokens: number;
+  output_tokens: number;
+  recovery_handle: string | null;
+  metadata: JsonObject;
+}
+
+export interface RagMiddleware {
+  optimize(
+    documents: unknown[],
+    query?: string,
+    options?: JsonObject,
+  ): Promise<StructuredOptimization>;
+  recover(handle: string): Promise<RecoveryResult>;
+}
+
+export interface ApiPayloadMiddleware {
+  optimize(
+    payload: JsonObject | unknown[],
+    query?: string,
+    options?: JsonObject,
+  ): Promise<StructuredOptimization>;
+  recover(handle: string): Promise<RecoveryResult>;
+}
+
+export interface DatabaseMiddleware {
+  optimize(
+    rows: unknown[],
+    query?: string,
+    columns?: string[] | null,
+    options?: JsonObject,
+  ): Promise<StructuredOptimization>;
+  recover(handle: string): Promise<RecoveryResult>;
+}
+
 export interface RecoveryResult {
   schema: number;
   handle: string;
@@ -226,6 +266,45 @@ export class AccoClient {
     return this.request("POST", "/v1/output/optimize", payload);
   }
 
+  optimizeRag(
+    documents: unknown[],
+    query = "",
+    options: JsonObject = {},
+  ): Promise<StructuredOptimization> {
+    return this.request("POST", "/v1/middleware/rag", {
+      documents,
+      query,
+      options,
+    });
+  }
+
+  optimizeApiPayload(
+    payload: JsonObject | unknown[],
+    query = "",
+    options: JsonObject = {},
+  ): Promise<StructuredOptimization> {
+    return this.request("POST", "/v1/middleware/api", {
+      payload,
+      query,
+      options,
+    });
+  }
+
+  optimizeDatabaseRows(
+    rows: unknown[],
+    query = "",
+    columns: string[] | null = null,
+    options: JsonObject = {},
+  ): Promise<StructuredOptimization> {
+    const payload: JsonObject = {
+      rows,
+      query,
+      options,
+    };
+    if (columns !== null) payload.columns = columns;
+    return this.request("POST", "/v1/middleware/database", payload);
+  }
+
   routeModel(
     prompt: string,
     options: JsonObject = {},
@@ -320,6 +399,37 @@ export class AccoClient {
         body: encoded,
       });
     }) as typeof fetch;
+  }
+
+  rag(): RagMiddleware {
+    return {
+      optimize: (documents: unknown[], query = "", options: JsonObject = {}) =>
+        this.optimizeRag(documents, query, options),
+      recover: (handle: string) => this.recover(handle),
+    };
+  }
+
+  api(): ApiPayloadMiddleware {
+    return {
+      optimize: (
+        payload: JsonObject | unknown[],
+        query = "",
+        options: JsonObject = {},
+      ) => this.optimizeApiPayload(payload, query, options),
+      recover: (handle: string) => this.recover(handle),
+    };
+  }
+
+  database(): DatabaseMiddleware {
+    return {
+      optimize: (
+        rows: unknown[],
+        query = "",
+        columns: string[] | null = null,
+        options: JsonObject = {},
+      ) => this.optimizeDatabaseRows(rows, query, columns, options),
+      recover: (handle: string) => this.recover(handle),
+    };
   }
 
   middleware(provider: string): AccoMiddleware {

@@ -61,6 +61,46 @@ export interface OutputOptimization {
   recovery_handle: string | null;
 }
 
+export interface StructuredOptimization {
+  schema: number;
+  domain: "rag" | "api" | "database";
+  format: "json";
+  value: unknown;
+  changed: boolean;
+  original_tokens: number;
+  output_tokens: number;
+  recovery_handle: string | null;
+  metadata: JsonObject;
+}
+
+export interface RagMiddleware {
+  optimize(
+    documents: unknown[],
+    query?: string,
+    options?: JsonObject,
+  ): Promise<StructuredOptimization>;
+  recover(handle: string): Promise<RecoveryResult>;
+}
+
+export interface ApiPayloadMiddleware {
+  optimize(
+    payload: JsonObject | unknown[],
+    query?: string,
+    options?: JsonObject,
+  ): Promise<StructuredOptimization>;
+  recover(handle: string): Promise<RecoveryResult>;
+}
+
+export interface DatabaseMiddleware {
+  optimize(
+    rows: unknown[],
+    query?: string,
+    columns?: string[] | null,
+    options?: JsonObject,
+  ): Promise<StructuredOptimization>;
+  recover(handle: string): Promise<RecoveryResult>;
+}
+
 export interface RecoveryResult {
   schema: number;
   handle: string;
@@ -135,6 +175,22 @@ export declare class AccoClient {
     exitCode?: number | null,
     options?: JsonObject,
   ): Promise<OutputOptimization>;
+  optimizeRag(
+    documents: unknown[],
+    query?: string,
+    options?: JsonObject,
+  ): Promise<StructuredOptimization>;
+  optimizeApiPayload(
+    payload: JsonObject | unknown[],
+    query?: string,
+    options?: JsonObject,
+  ): Promise<StructuredOptimization>;
+  optimizeDatabaseRows(
+    rows: unknown[],
+    query?: string,
+    columns?: string[] | null,
+    options?: JsonObject,
+  ): Promise<StructuredOptimization>;
   routeModel(
     prompt: string,
     options?: JsonObject,
@@ -144,5 +200,8 @@ export declare class AccoClient {
     provider: string,
     options?: ProviderFetchOptions,
   ): typeof fetch;
+  rag(): RagMiddleware;
+  api(): ApiPayloadMiddleware;
+  database(): DatabaseMiddleware;
   middleware(provider: string): AccoMiddleware;
 }

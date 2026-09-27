@@ -128,13 +128,23 @@ def _compact_json_value(value: Any, query_terms: set[str], depth: int = 0) -> An
     return value
 
 
+def compact_json_value(value: Any, *, query: str = "") -> Any:
+    """Return ACCO's deterministic structural JSON compaction for SDK middleware.
+
+    The returned value is JSON-compatible when the input is JSON-compatible.
+    This helper performs no persistence by itself; callers that accept a lossy
+    result must apply ACCO's normal exact-recovery gate.
+    """
+    return _compact_json_value(value, _terms(query))
+
+
 def _compress_json(text: str, query: str) -> tuple[str, dict[str, Any]]:
     """Return a compact structural JSON representation."""
     try:
         value = json.loads(text)
     except (ValueError, TypeError):
         return text, {}
-    compact = _compact_json_value(value, _terms(query))
+    compact = compact_json_value(value, query=query)
     candidate = json.dumps(compact, ensure_ascii=False, separators=(",", ":")) + "\n"
     return candidate, {"json_root": type(value).__name__}
 

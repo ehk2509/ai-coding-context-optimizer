@@ -250,3 +250,182 @@ def test_sdk_config_requires_existing_project_root(tmp_path):
     """Embedding against a nonexistent root should fail before creating state."""
     with pytest.raises(ValueError, match="existing directory"):
         AccoEngine(Path(tmp_path / "missing"))
+
+
+
+def test_rag_middleware_focuses_documents_and_recovers_canonical_input(
+    tmp_path, monkeypatch
+):
+    """RAG adapter should keep focused chunks without performing retrieval."""
+    engine = _engine(tmp_path, monkeypatch)
+    documents = [
+        {
+            "id": f"doc-{index}",
+            "content": (
+                f"general catalog text {index} " + "x" * 200
+                if index != 17
+                else "critical websocket retry policy " + "y" * 200
+            ),
+            "score": 1.0 - index / 100,
+        }
+        for index in range(30)
+    ]
+
+    result = engine.rag().optimize(
+        documents,
+        query="websocket retry",
+        max_documents=5,
+        min_reduction=0.0,
+    )
+
+    assert result["domain"] == "rag"
+    assert result["changed"] is True
+    assert result["metadata"]["documents"] == 30
+    assert result["metadata"]["shown_documents"] == 5
+    assert any(item["id"] == "doc-17" for item in result["value"])
+    recovered = engine.rag().recover(result["recovery_handle"])
+    assert json.loads(recovered["payload"]) == documents
+    assert recovered["metadata"]["domain"] == "rag"
+    assert recovered["metadata"]["representation"] == "canonical-json"
+
+
+def test_api_middleware_compacts_large_json_without_network_side_effects(
+    tmp_path, monkeypatch
+):
+    """API adapter should only transform caller-supplied JSON context."""
+    engine = _engine(tmp_path, monkeypatch)
+    payload = {
+        "items": [
+            {
+                "id": index,
+                "name": f"item-{index}",
+                "status": "target" if index == 42 else "ordinary",
+                "blob": "z" * 120,
+            }
+            for index in range(80)
+        ],
+        "cursor": "next-page",
+    }
+
+    result = engine.api().optimize(
+        payload,
+        query="target",
+        min_reduction=0.0,
+    )
+
+    assert result["domain"] == "api"
+    assert result["changed"] is True
+    assert result["metadata"]["root_type"] == "object"
+    rendered = json.dumps(result["value"])
+    assert '"id": 42' in rendered
+    assert len(result["value"]["items"]["items"]) <= 6
+    recovered = engine.api().recover(result["recovery_handle"])
+    assert json.loads(recovered["payload"]) == payload
+
+
+def test_database_middleware_normalizes_positional_rows_and_focuses_matches(
+    tmp_path, monkeypatch
+):
+    """Database adapter should compress supplied rows without executing SQL."""
+    engine = _engine(tmp_path, monkeypatch)
+    rows = [
+        [index, f"user-{index}", "blocked" if index == 73 else "active"]
+        for index in range(120)
+    ]
+
+    result = engine.database().optimize(
+        rows,
+        columns=["id", "name", "status"],
+        query="blocked",
+        max_rows=12,
+        min_reduction=0.0,
+    )
+
+    assert result["domain"] == "database"
+    assert result["changed"] is True
+    assert result["metadata"]["rows"] == 120
+    assert result["metadata"]["shown_rows"] == 12
+    assert any(row["id"] == 73 for row in result["value"]["rows"])
+    recovered = engine.database().recover(result["recovery_handle"])
+    restored = json.loads(recovered["payload"])
+    assert restored["columns"] == ["id", "name", "status"]
+    assert restored["rows"][73] == [73, "user-73", "blocked"]
+
+
+def test_domain_middleware_fails_open_when_recovery_capacity_is_unavailable(
+    tmp_path, monkeypatch
+):
+    """Lossy structured middleware must return full input when recovery cannot fit."""
+    engine = _engine(tmp_path, monkeypatch, capacity=8)
+    payload = [{"id": index, "blob": "x" * 200} for index in range(50)]
+
+    result = engine.optimize_api_payload(
+        payload,
+        min_reduction=0.0,
+    )
+
+    assert result["changed"] is False
+    assert result["value"] == payload
+    assert result["recovery_handle"] is None
+    assert result["output_tokens"] == result["original_tokens"]
+
+
+def test_database_middleware_rejects_ambiguous_or_non_json_rows(
+    tmp_path, monkeypatch
+):
+    """Structured adapters should fail closed rather than stringify arbitrary objects."""
+    engine = _engine(tmp_path, monkeypatch)
+
+    with pytest.raises(ValueError, match="columns are required"):
+        engine.optimize_database_rows([[1, "a"]])
+
+    with pytest.raises(ValueError, match="strict JSON"):
+        engine.optimize_api_payload({"bad": {1, 2, 3}})
+
+
+def test_sdk_application_exposes_optional_domain_middleware(
+    tmp_path, monkeypatch
+):
+    """The bridge should expose RAG/API/database adapters as opt-in endpoints."""
+    app = SdkApplication(_engine(tmp_path, monkeypatch))
+
+    status, rag = app.dispatch(
+        "POST",
+        "/v1/middleware/rag",
+        {
+            "documents": [
+                {"id": index, "content": f"chunk {index} " + "x" * 80}
+                for index in range(20)
+            ],
+            "query": "chunk 12",
+            "options": {"max_documents": 4, "min_reduction": 0.0},
+        },
+    )
+    assert status == 200
+    assert rag["domain"] == "rag"
+    assert rag["changed"] is True
+
+    status, api = app.dispatch(
+        "POST",
+        "/v1/middleware/api",
+        {
+            "payload": {
+                "items": [{"id": index, "blob": "x" * 80} for index in range(30)]
+            },
+            "options": {"min_reduction": 0.0},
+        },
+    )
+    assert status == 200
+    assert api["domain"] == "api"
+
+    status, database = app.dispatch(
+        "POST",
+        "/v1/middleware/database",
+        {
+            "rows": [[index, f"name-{index}"] for index in range(40)],
+            "columns": ["id", "name"],
+            "options": {"max_rows": 10, "min_reduction": 0.0},
+        },
+    )
+    assert status == 200
+    assert database["domain"] == "database"
