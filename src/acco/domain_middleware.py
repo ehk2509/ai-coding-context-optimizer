@@ -52,7 +52,14 @@ def _canonical_json(value: Any) -> str:
 
 def _terms(query: str) -> tuple[str, ...]:
     """Return stable lowercase focus terms for domain-level selection."""
-    return tuple(dict.fromkeys(match.group(0).lower() for match in _TERM.finditer(query)))
+    if not isinstance(query, str):
+        raise ValueError("query must be a string")
+    return tuple(
+        dict.fromkeys(
+            match.group(0).lower()
+            for match in _TERM.finditer(query)
+        )
+    )
 
 
 def _score_item(item: Any, query_terms: tuple[str, ...]) -> int:
@@ -103,7 +110,11 @@ def _select_items(
             )
         )
 
-    if query_terms or (prefer_numeric_score and any(math.isfinite(row[2]) for row in ranked)):
+    has_declared_scores = (
+        prefer_numeric_score
+        and any(math.isfinite(row[2]) for row in ranked)
+    )
+    if query_terms or has_declared_scores:
         indexes = sorted(
             sorted(
                 range(len(items)),
