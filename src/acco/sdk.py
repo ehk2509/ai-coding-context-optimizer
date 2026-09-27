@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from .browser_context import compress_browser_payload
+from .context_budget import plan_context_budget as build_context_budget
 from .context_router import route_context
 from .domain_middleware import (
     optimize_api_payload,
@@ -73,6 +74,7 @@ class AccoEngine:
         compress_tool_results: bool = True,
         tool_result_min_tokens: int = 800,
         prefix_tracking: bool = True,
+        context_budget_total_tokens: int | None = None,
     ) -> dict[str, Any]:
         """Optimize one provider request while keeping exact recovery available."""
         if not isinstance(provider, str) or not provider.strip():
@@ -87,6 +89,7 @@ class AccoEngine:
             tool_result_min_tokens=tool_result_min_tokens,
             recovery_capacity_bytes=self.recovery_capacity_bytes,
             prefix_tracking=prefix_tracking,
+            context_budget_total_tokens=context_budget_total_tokens,
         )
         return {
             "schema": 1,
@@ -198,6 +201,22 @@ class AccoEngine:
             "output_tokens": output_tokens if changed else original_tokens,
             "recovery_handle": recovery_handle,
         }
+
+    def plan_context_budget(
+        self,
+        prompt: str,
+        *,
+        total_tokens: int,
+        task: str | None = None,
+        observed_tokens: dict[str, int] | None = None,
+    ) -> dict[str, Any]:
+        """Plan one total model-context envelope for a custom agent."""
+        return build_context_budget(
+            prompt,
+            total_tokens=total_tokens,
+            task=task,
+            observed_tokens=observed_tokens,
+        ).to_dict()
 
     def route_model(
         self,

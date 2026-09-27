@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .context_browser import browse_context
+from .context_budget import plan_context_budget
 from .feedback import record_feedback
 from .impact import ImpactReport, analyze_impact
 from .knowledge import FindingStore
@@ -117,13 +118,29 @@ class RepositoryContextService:
         exclude_files: set[str] | None = None,
         restrict_files: set[str] | None = None,
         adaptive_budget: bool = True,
+        context_budget_total: int | None = None,
         stage_registry: RankingStageRegistry | None = None,
     ) -> ContextPack:
         """Build a task-aware context pack using the service's shared index."""
-        return build_context_pack(
+        context_plan = None
+        effective_max_tokens = max_tokens
+        configured = settings_for(self.root)
+        resolved_total = context_budget_total
+        if resolved_total is None and configured.context_budget_enabled:
+            resolved_total = configured.context_budget_total_tokens
+        if resolved_total is not None:
+            context_plan = plan_context_budget(
+                query,
+                total_tokens=resolved_total,
+            )
+            effective_max_tokens = min(
+                max_tokens,
+                context_plan.tokens_for("source"),
+            )
+        pack = build_context_pack(
             self.root,
             query,
-            max_tokens=max_tokens,
+            max_tokens=effective_max_tokens,
             max_files=max_files,
             context_lines=context_lines,
             use_gitignore=self.use_gitignore,
@@ -146,6 +163,9 @@ class RepositoryContextService:
             cache_enabled=bool(self.retrieval_cache_enabled),
             cache_max_entries=int(self.retrieval_cache_max_entries or 64),
         )
+        if context_plan is not None:
+            pack.context_budget_plan = context_plan.to_dict()
+        return pack
 
     def explain_ranking(
         self,

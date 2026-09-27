@@ -286,6 +286,31 @@ assumption. Estimated tool-context savings may be shown under a clearly labeled
 fresh-input-once scenario, but are **not** presented as measured API savings or
 cost-per-success evidence.
 
+## Adaptive whole-context budgets
+
+ACCO can optionally plan the **entire model-context envelope**, not only the
+source pack:
+
+```bash
+acco context-budget "Debug the failing auth handler" --total-tokens 12000
+
+# Apply the derived source slice to repository retrieval.
+acco pack . --query "Debug the failing auth handler" \
+  --max-tokens 9000 \
+  --context-budget 12000
+```
+
+The deterministic plan allocates tokens across exact source, prior history,
+durable project memory, historical tool results, tool schemas, and reserve.
+Existing behavior remains the default; projects opt in with
+`[context_budget] enabled = true`.
+
+Repository packing enforces the exact-source slice. Provider interception uses
+the schema/tool-result slices to decide when its existing recoverable
+compressors should activate. History and memory slices are exposed to custom
+agents through the Python/TypeScript SDK rather than being silently rewritten.
+See [context-budget](docs/commands/context-budget.md).
+
 ## Safe oversized-prompt ingress
 
 Claude Code's `UserPromptSubmit` hook can block a prompt or add context, but

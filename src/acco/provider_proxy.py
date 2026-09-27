@@ -53,6 +53,7 @@ class ProviderProxyConfig:
     model_routing_calibration_file: str = ".acco.routing-calibration.json"
     model_routing_min_savings: float = 0.05
     instance_id: str = ""
+    context_budget_total_tokens: int | None = None
 
     def validate(self) -> ProviderProxyConfig:
         """Reject unsafe binding/upstream combinations before serving."""
@@ -94,6 +95,11 @@ class ProviderProxyConfig:
             )
         if not 0 <= float(self.model_routing_min_savings) <= 1:
             raise ValueError("provider model routing min savings must be between 0 and 1")
+        if (
+            self.context_budget_total_tokens is not None
+            and int(self.context_budget_total_tokens) < 1000
+        ):
+            raise ValueError("context budget total tokens must be at least 1000")
         return self
 
 
@@ -149,6 +155,7 @@ def transform_request_bytes(
         model_routing_mode=config.model_routing_mode,
         model_routing_calibration_file=config.model_routing_calibration_file,
         model_routing_min_savings=config.model_routing_min_savings,
+        context_budget_total_tokens=config.context_budget_total_tokens,
     )
     encoded = (
         json.dumps(

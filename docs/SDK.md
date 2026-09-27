@@ -147,6 +147,38 @@ All three surfaces use ACCO's shared structural JSON compaction, token/byte
 reduction gates, and recovery store. If exact recovery cannot be persisted, the
 full input representation is returned unchanged.
 
+## Whole-context planning
+
+Custom agents can ask ACCO to allocate one total context envelope before they
+assemble a provider request:
+
+```python
+plan = acco.plan_context_budget(
+    user_prompt,
+    total_tokens=12000,
+    observed_tokens={
+        "tool_results": 2400,
+        "schemas": 500,
+        "memory": 300,
+    },
+)
+source_budget = plan["allocations"]["source"]
+```
+
+TypeScript:
+
+```ts
+const plan = await acco.planContextBudget(
+  userPrompt,
+  12000,
+  { observed_tokens: { tool_results: 2400, schemas: 500 } },
+);
+```
+
+This is an orchestration contract, not a hidden context mutation. Provider
+middleware can also receive `context_budget_total_tokens` in its options;
+ACCO then uses only the schema/tool-result slices it can enforce safely.
+
 ## TypeScript: typed local client
 
 The repository contains a typed package at `sdk/typescript`. It does not port
@@ -228,6 +260,7 @@ The bridge exposes only versioned JSON endpoints:
 | `POST` | `/v1/middleware/api` | optional JSON API-payload context compression |
 | `POST` | `/v1/middleware/database` | optional caller-supplied row compression |
 | `POST` | `/v1/output/optimize` | command-aware output optimization |
+| `POST` | `/v1/context-budget` | deterministic whole-context allocation |
 | `POST` | `/v1/route` | deterministic model-routing decision |
 | `POST` | `/v1/recover` | exact recovery by `tsr_...` handle |
 

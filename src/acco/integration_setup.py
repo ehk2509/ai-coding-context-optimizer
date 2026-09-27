@@ -145,6 +145,10 @@ model_routing = "off"
 routing_calibration_file = ".acco.routing-calibration.json"
 routing_min_savings = 0.05
 
+[context_budget]
+enabled = false
+total_tokens = 12000
+
 [tool_proxy]
 enabled = false
 provider = "ollama"

@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .context_budget import ContextBudgetPlan, plan_context_budget
 from .context_router import route_context
 from .efficiency.store import append_event
 from .estimate import estimate_tokens
@@ -49,6 +50,7 @@ class ProviderTransformResult:
     deduplicated_segments: int = 0
     estimated_duplicate_tokens_saved: int = 0
     model_routing: dict[str, Any] | None = None
+    context_budget: dict[str, Any] | None = None
 
     def metadata(self) -> dict:
         """Return request transformation metadata without request content."""
@@ -72,6 +74,7 @@ class ProviderTransformResult:
                 "evaluated": False,
                 "applied": False,
             },
+            "context_budget": self.context_budget,
             "policy": "retrieval-first-historical-only",
         }
 
@@ -79,6 +82,84 @@ class ProviderTransformResult:
 def _json_tokens(value: Any) -> int:
     """Estimate tokens in compact JSON serialization."""
     return estimate_tokens(json.dumps(value, ensure_ascii=False, separators=(",", ":")))
+
+
+def _tool_result_token_segments(
+    body: dict,
+    profile: ProviderRequestProfile,
+) -> list[int]:
+    """Return content-free token sizes for explicit historical tool-result strings."""
+    segments: list[int] = []
+    messages = body.get("messages")
+    if isinstance(messages, list):
+        for message in messages:
+            if not isinstance(message, dict):
+                continue
+            content = message.get("content")
+            if message.get("role") == "tool" and isinstance(content, str):
+                segments.append(estimate_tokens(content))
+            if isinstance(content, list):
+                for block in content:
+                    if not isinstance(block, dict) or block.get("type") != "tool_result":
+                        continue
+                    value = block.get("content")
+                    if isinstance(value, str):
+                        segments.append(estimate_tokens(value))
+                    elif isinstance(value, list):
+                        for item in value:
+                            if (
+                                isinstance(item, dict)
+                                and item.get("type") == "text"
+                                and isinstance(item.get("text"), str)
+                            ):
+                                segments.append(estimate_tokens(item["text"]))
+
+    input_items = body.get("input")
+    if isinstance(input_items, list):
+        for item in input_items:
+            if (
+                isinstance(item, dict)
+                and item.get("type") in {"function_call_output", "tool_result"}
+                and isinstance(item.get("output"), str)
+            ):
+                segments.append(estimate_tokens(item["output"]))
+
+    if profile.provider == "gemini":
+        for parent, key in gemini_function_responses(body):
+            response = parent[key]
+            if isinstance(response, str):
+                segments.append(estimate_tokens(response))
+            elif isinstance(response, (dict, list)):
+                for leaf_parent, leaf_key in iter_gemini_function_response_strings(response):
+                    segments.append(estimate_tokens(leaf_parent[leaf_key]))
+    return segments
+
+
+def _provider_context_budget(
+    body: dict,
+    profile: ProviderRequestProfile,
+    *,
+    total_tokens: int | None,
+) -> tuple[ContextBudgetPlan | None, list[int], int]:
+    """Plan provider-side schema/tool slices from observed request demand."""
+    segments = _tool_result_token_segments(body, profile)
+    schema_tokens = (
+        _json_tokens(body["tools"])
+        if isinstance(body.get("tools"), list)
+        else 0
+    )
+    if total_tokens is None:
+        return None, segments, schema_tokens
+    observed = {
+        "tool_results": sum(segments),
+        "schemas": schema_tokens,
+    }
+    plan = plan_context_budget(
+        latest_user_text(body, profile),
+        total_tokens=total_tokens,
+        observed_tokens=observed,
+    )
+    return plan, segments, schema_tokens
 
 
 def _compress_tool_text(
@@ -294,6 +375,7 @@ def transform_provider_request(
     model_routing_calibration_file: str = ".acco.routing-calibration.json",
     model_routing_min_savings: float = 0.05,
     live_zone: bool = True,
+    context_budget_total_tokens: int | None = None,
 ) -> ProviderTransformResult:
     """Optimize historical provider context while leaving current task/source intact."""
     if not isinstance(body, dict):
@@ -312,6 +394,29 @@ def transform_provider_request(
         "evaluated": False,
         "applied": False,
     }
+    context_plan, tool_segment_tokens, schema_tokens = _provider_context_budget(
+        body,
+        profile,
+        total_tokens=context_budget_total_tokens,
+    )
+    effective_tool_result_min_tokens = tool_result_min_tokens
+    compress_schema_for_budget = True
+    compress_tools_for_budget = True
+    if context_plan is not None:
+        schema_budget = context_plan.tokens_for("schemas")
+        tool_budget = context_plan.tokens_for("tool_results")
+        compress_schema_for_budget = schema_tokens > schema_budget
+        total_tool_tokens = sum(tool_segment_tokens)
+        compress_tools_for_budget = total_tool_tokens > tool_budget
+        if compress_tools_for_budget and tool_segment_tokens:
+            target_per_segment = max(
+                120,
+                tool_budget // len(tool_segment_tokens),
+            )
+            effective_tool_result_min_tokens = min(
+                tool_result_min_tokens,
+                target_per_segment,
+            )
 
     protected_messages = 0
     protected_input = 0
@@ -334,7 +439,7 @@ def transform_provider_request(
             transformed,
             profile,
             recovery=recovery,
-            min_tokens=tool_result_min_tokens,
+            min_tokens=effective_tool_result_min_tokens,
             enabled=deduplicate_history and not (protected_messages or protected_input),
         )
         if history.segments:
@@ -342,7 +447,11 @@ def transform_provider_request(
             deduplicated_segments = history.segments
             duplicate_tokens_saved = history.estimated_tokens_saved
 
-        if compress_schemas and isinstance(transformed.get("tools"), list):
+        if (
+            compress_schemas
+            and compress_schema_for_budget
+            and isinstance(transformed.get("tools"), list)
+        ):
             schema = compress_tool_catalog(
                 transformed["tools"],
                 recovery=recovery,
@@ -352,20 +461,20 @@ def transform_provider_request(
                 transformed["tools"] = schema.value
                 schema_handle = schema.recovery_handle
 
-        if compress_tool_results:
+        if compress_tool_results and compress_tools_for_budget:
             query = "" if live_zone else latest_user_text(transformed, profile)
             transformed_segments += _transform_messages(
                 transformed,
                 query=query,
                 recovery=recovery,
-                min_tokens=tool_result_min_tokens,
+                min_tokens=effective_tool_result_min_tokens,
                 handles=handles,
             )
             transformed_segments += _transform_openai_input(
                 transformed,
                 query=query,
                 recovery=recovery,
-                min_tokens=tool_result_min_tokens,
+                min_tokens=effective_tool_result_min_tokens,
                 handles=handles,
             )
             if profile.provider == "gemini":
@@ -373,7 +482,7 @@ def transform_provider_request(
                     transformed,
                     query=query,
                     recovery=recovery,
-                    min_tokens=tool_result_min_tokens,
+                    min_tokens=effective_tool_result_min_tokens,
                     handles=handles,
                 )
     except RecoveryCapacityError:
@@ -457,4 +566,5 @@ def transform_provider_request(
         deduplicated_segments=deduplicated_segments,
         estimated_duplicate_tokens_saved=duplicate_tokens_saved,
         model_routing=routing_metadata,
+        context_budget=context_plan.to_dict() if context_plan is not None else None,
     )

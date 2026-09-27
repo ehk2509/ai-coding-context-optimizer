@@ -195,6 +195,11 @@ def provider_proxy_main(argv: list[str]) -> int:
     parser.add_argument("--allow-non-loopback", action="store_true")
     parser.add_argument("--no-prefix-tracking", action="store_true")
     parser.add_argument("--no-usage-telemetry", action="store_true")
+    parser.add_argument(
+        "--context-budget",
+        type=int,
+        help="override total model-context budget for adaptive schema/tool slices",
+    )
     args = parser.parse_args(argv)
     root = Path(args.path).resolve()
     settings = settings_for(root)
@@ -228,6 +233,15 @@ def provider_proxy_main(argv: list[str]) -> int:
                 args.routing_min_savings
                 if args.routing_min_savings is not None
                 else settings.provider_model_routing_min_savings
+            ),
+            context_budget_total_tokens=(
+                args.context_budget
+                if args.context_budget is not None
+                else (
+                    settings.context_budget_total_tokens
+                    if settings.context_budget_enabled
+                    else None
+                )
             ),
         ).validate()
     except ValueError as exc:

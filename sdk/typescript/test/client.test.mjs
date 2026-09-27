@@ -304,3 +304,46 @@ test("typed domain middleware exposes RAG API and database surfaces", async () =
   assert.deepEqual(seen[2].body.columns, ["id", "name"]);
   assert.deepEqual(seen[2].body.options, { max_rows: 5 });
 });
+
+
+test("context budget planner is exposed through the typed client", async () => {
+  await withServer(async (req, res) => {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    assert.equal(req.url, "/v1/context-budget");
+    assert.equal(body.prompt, "Debug the failing parser");
+    assert.equal(body.total_tokens, 9000);
+    assert.deepEqual(body.options, {
+      observed_tokens: { tool_results: 2200 },
+    });
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({
+      total_tokens: 9000,
+      task: "debugging",
+      complexity_tier: "simple",
+      risk_level: "normal",
+      allocations: {
+        source: 4300,
+        history: 1000,
+        memory: 400,
+        tool_results: 1800,
+        schemas: 300,
+        reserve: 1200,
+      },
+      weights: {},
+      observed_tokens: { tool_results: 2200 },
+      reasons: ["task=debugging"],
+    }));
+  }, async (baseUrl) => {
+    const client = new AccoClient({ baseUrl });
+    const plan = await client.planContextBudget(
+      "Debug the failing parser",
+      9000,
+      { observed_tokens: { tool_results: 2200 } },
+    );
+    assert.equal(plan.total_tokens, 9000);
+    assert.equal(plan.task, "debugging");
+    assert.equal(plan.allocations.tool_results, 1800);
+  });
+});

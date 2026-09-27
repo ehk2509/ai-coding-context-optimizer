@@ -115,6 +115,14 @@ export class AccoClient {
     return this.request("POST", "/v1/middleware/database", payload);
   }
 
+  planContextBudget(prompt, totalTokens, options = {}) {
+    return this.request("POST", "/v1/context-budget", {
+      prompt,
+      total_tokens: totalTokens,
+      options,
+    });
+  }
+
   routeModel(prompt, options = {}) {
     return this.request("POST", "/v1/route", { prompt, options });
   }

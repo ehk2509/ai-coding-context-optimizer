@@ -429,3 +429,71 @@ def test_sdk_application_exposes_optional_domain_middleware(
     )
     assert status == 200
     assert database["domain"] == "database"
+
+
+
+def test_python_sdk_exposes_context_budget_planner(tmp_path, monkeypatch):
+    """Custom agents should receive the same whole-context allocation contract."""
+    engine = _engine(tmp_path, monkeypatch)
+    plan = engine.plan_context_budget(
+        "Debug the failing authentication handler.",
+        total_tokens=9000,
+        observed_tokens={"tool_results": 2500, "schemas": 300},
+    )
+
+    assert plan["total_tokens"] == 9000
+    assert plan["task"] == "debugging"
+    assert sum(plan["allocations"].values()) == 9000
+    assert plan["observed_tokens"]["tool_results"] == 2500
+
+
+def test_sdk_application_exposes_context_budget_planner(tmp_path, monkeypatch):
+    """The loopback bridge should expose whole-context planning to non-Python agents."""
+    app = SdkApplication(_engine(tmp_path, monkeypatch))
+    status, plan = app.dispatch(
+        "POST",
+        "/v1/context-budget",
+        {
+            "prompt": "Review the production authentication migration.",
+            "total_tokens": 10000,
+            "options": {
+                "observed_tokens": {
+                    "memory": 200,
+                    "tool_results": 1200,
+                }
+            },
+        },
+    )
+
+    assert status == 200
+    assert plan["total_tokens"] == 10000
+    assert plan["task"] == "review"
+    assert plan["risk_level"] == "high"
+    assert sum(plan["allocations"].values()) == 10000
+
+
+def test_sdk_provider_optimization_can_apply_context_budget(tmp_path, monkeypatch):
+    """Embedded provider middleware should accept the same optional total budget."""
+    engine = _engine(tmp_path, monkeypatch)
+    historical = "\n".join(
+        f"failure row {index} " + "x" * 100
+        for index in range(240)
+    )
+    body = {
+        "messages": [
+            {"role": "tool", "content": historical},
+            {"role": "user", "content": "Debug this failure."},
+        ]
+    }
+
+    result = engine.optimize_provider_request(
+        "openai",
+        body,
+        compress_schemas=False,
+        tool_result_min_tokens=100,
+        prefix_tracking=False,
+        context_budget_total_tokens=2000,
+    )
+
+    assert result["metadata"]["context_budget"]["total_tokens"] == 2000
+    assert result["metadata"]["changed"] is True

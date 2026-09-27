@@ -194,6 +194,19 @@ Package manifests contribute only cross-repository identity/dependency hints.
 Final source remains exact repository-local pack output with repository
 provenance retained in the combined context.
 
+## Whole-context budget boundary
+
+`context_budget.py` is a deterministic policy planner above individual ACCO
+compressors. It allocates one caller-owned token envelope across source,
+history, memory, historical tool results, tool schemas, and reserve using task,
+complexity, risk, and optional observed component sizes.
+
+The planner does not retrieve source, persist memory, or rewrite history itself.
+`RepositoryContextService` consumes only the `source` slice. Provider
+transformation consumes only the `schemas` and `tool_results` slices. The
+remaining allocations are explicit orchestration guidance for hosts and SDK
+clients until independently validated runtime mechanisms exist for them.
+
 ## Repository application boundary
 
 `RepositoryContextService` is the shared application layer for repository-aware
