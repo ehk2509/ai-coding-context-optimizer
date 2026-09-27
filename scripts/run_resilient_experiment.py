@@ -41,6 +41,13 @@ AUTH = re.compile(
 EPOCH = re.compile(r"\|(\d{10})\b")
 # Claude Code's own subscription-limit results. Specific enough to trust even
 # inside the long JSON result lines that error_lines() filters out.
+# Claude Code's own OAuth failures; like the limit messages, they arrive inside
+# long JSON result lines that error_lines() filters out.
+SUBSCRIPTION_AUTH = re.compile(
+    r"OAuth (?:access )?token has expired|Re-authenticate to continue|"
+    r"OAuth token (?:has been )?revoked",
+    re.I,
+)
 SUBSCRIPTION_LIMIT = re.compile(
     r"you'?ve hit your (?:\w+ )?limit|hit your session limit|usage limit reached", re.I
 )
@@ -104,6 +111,8 @@ def error_lines(text: str) -> str:
 
 def classify(text: str) -> str:
     """Classify a failed attempt from its log."""
+    if SUBSCRIPTION_AUTH.search(text):
+        return "auth"
     if SUBSCRIPTION_LIMIT.search(text):
         return "limit"
     text = error_lines(text)
