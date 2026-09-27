@@ -10,6 +10,7 @@ from pathlib import Path
 from ..claude_plugin import plugin_status, render_plugin
 from ..client_capabilities import capability_report
 from ..fastpath import status as fastpath_status
+from ..host_transport import transport_report
 from ..host_validate import validate_host
 from ..integration_setup import (
     HOSTS,
@@ -95,6 +96,38 @@ def client_capabilities_main(argv: list[str]) -> int:
         )
         print(f"  {name:<14} guaranteed={guaranteed} conditional={conditional}")
     print("Use --client NAME for feature-level prerequisites.")
+    return 0
+
+
+def transport_status_main(argv: list[str]) -> int:
+    """Report provider-transport support without overstating host guarantees."""
+    parser = argparse.ArgumentParser(prog="acco transport-status")
+    parser.add_argument("--host")
+    parser.add_argument("--json", action="store_true")
+    args = parser.parse_args(argv)
+    try:
+        report = transport_report(args.host)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    if args.json:
+        print(json.dumps(report, indent=2))
+        return 0
+    if args.host:
+        record = report["host"]
+        print(f"ACCO TRANSPORT — {record['host']}")
+        print(f"foreground: {record['foreground']}")
+        print(f"persistent: {record['persistent']}")
+        print(f"provider:   {record['provider'] or 'dynamic'}")
+        if record["note"]:
+            print("note: " + record["note"])
+        return 0
+    print("ACCO HOST TRANSPORT REGISTRY")
+    for name, record in report["hosts"].items():
+        print(
+            f"  {name:<9} foreground={record['foreground']:<14} "
+            f"persistent={record['persistent']}"
+        )
     return 0
 
 
