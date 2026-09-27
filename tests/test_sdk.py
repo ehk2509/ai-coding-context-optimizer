@@ -349,11 +349,7 @@ def test_database_middleware_normalizes_positional_rows_and_focuses_matches(
     recovered = engine.database().recover(result["recovery_handle"])
     restored = json.loads(recovered["payload"])
     assert restored["columns"] == ["id", "name", "status"]
-    assert restored["rows"][73] == {
-        "id": 73,
-        "name": "user-73",
-        "status": "blocked",
-    }
+    assert restored["rows"][73] == [73, "user-73", "blocked"]
 
 
 def test_domain_middleware_fails_open_when_recovery_capacity_is_unavailable(
