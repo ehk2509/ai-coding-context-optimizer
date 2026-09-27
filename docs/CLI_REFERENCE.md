@@ -40,6 +40,7 @@ For machine-readable fields, see [Machine-readable CLI contracts](JSON_OUTPUTS.m
 - [`install`](commands/install.md) — legacy/low-level Claude hook installer.
 - [`wrap`](commands/wrap.md) — zero-config launch for known or inferable coding CLIs through an ephemeral/existing ACCO provider proxy.
 - [`proxy`](commands/proxy.md) — install/manage persistent background provider proxies with durable Claude/Codex attachment.
+- [`transport-status`](commands/transport-status.md) — report whether each host supports automatic foreground interception, automatic persistence, environment-only persistence, or manual settings.
 - [`claude`](commands/claude.md) — launch Claude Code through the ACCO provider wrapper.
 - [`codex`](commands/codex.md) — launch Codex through the ACCO provider wrapper.
 - [`gemini`](commands/gemini.md) — launch Gemini CLI through the ACCO provider wrapper.

@@ -27,6 +27,7 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10
     import tomli as tomllib
 
 from .config import update_json
+from .host_transport import persistent_provider_map
 from .install import settings_path as claude_settings_path
 from .provider_proxy import ProviderProxyConfig, run_provider_proxy
 from .runtime_config import settings_for
@@ -34,10 +35,7 @@ from .state import state_dir
 from .wrapper import PROVIDERS
 
 PROFILE_SCHEMA = 1
-DURABLE_HOST_PROVIDER = {
-    "claude": "anthropic",
-    "codex": "openai",
-}
+DURABLE_HOST_PROVIDER = persistent_provider_map()
 CLAUDE_PROFILE_ENV = "ACCO_PERSISTENT_PROXY_PROFILE"
 CODEX_START_PREFIX = "# >>> acco persistent proxy "
 CODEX_END_PREFIX = "# <<< acco persistent proxy "
