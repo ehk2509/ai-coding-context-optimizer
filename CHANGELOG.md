@@ -1,5 +1,38 @@
 # Unreleased
 
+# 1.21.0 - 2026-09-27
+
+- **Broadened zero-config provider wrapping without replacing ACCO's
+  retrieval-first design.** `acco wrap` can infer provider-aware arbitrary
+  CLIs conservatively, preserve existing gateways, reuse an existing ACCO
+  proxy, and fail closed on ambiguous provider environments. Specialized
+  adapters now use documented GitHub Copilot BYOK variables, a safe manual
+  Cursor BYOK bridge, and ephemeral OpenClaw config overlays rather than
+  private-state rewrites.
+- **Added persistent background provider proxies for Claude Code and Codex.**
+  `acco proxy install|status|start|stop|uninstall` creates project/provider
+  stable loopback profiles with Linux systemd-user, macOS LaunchAgent, and
+  Windows logon-task lifecycle support. Host routing changes only after ACCO
+  verifies the expected proxy instance; profiles persist no provider
+  credentials, reserve ports across stopped sessions, survive launcher
+  upgrades, and roll back transactionally on partial installation failure.
+- **Added optional RAG/API/database compressor SDK middleware.** Python and
+  TypeScript callers can compress already-retrieved documents, caller-supplied
+  API JSON, and database/query rows through the same structural context router,
+  token/byte reduction gates, and exact recovery store used by the coding
+  product. These adapters do not retrieve, fetch, authenticate, connect to a
+  database, or execute SQL, preserving ACCO's coding-first identity.
+- **Strengthened cross-host safety boundaries.** Copilot Azure base semantics
+  are preserved; Cursor private settings remain untouched; OpenClaw
+  OAuth/native/custom routes and configured fallbacks fail closed when full
+  interception cannot be guaranteed; Codex persistent routing is
+  project-scoped and refuses unmanaged root provider overrides.
+- **Kept release claims conservative.** These additions expand integration,
+  persistence, and embeddability. They do not establish a new universal token,
+  API-dollar, task-success, or cost-per-success improvement. The existing
+  frozen retrieval and paired-agent evidence boundaries remain in force.
+
+
 # 1.20.0 - 2026-09-26
 
 - **Completed cross-platform standalone lifecycle support.** Frozen ACCO
