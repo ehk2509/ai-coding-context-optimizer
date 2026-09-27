@@ -31,6 +31,14 @@ def test_output_policy_never_budgets_away_verification():
     assert "Do not rerun an unchanged failing command" in policy.instructions
 
 
+def test_output_policy_requires_covering_every_reported_path():
+    # Focused verification must not turn "fixed the first path" into "done".
+    policy = build_output_policy("normal", task="coding")
+    assert "re-read the task" in policy.instructions
+    assert "every reported symptom, code path, API, and reproduction" in policy.instructions
+    assert "not only the first one fixed" in policy.instructions
+
+
 def test_output_policy_accepts_explicit_budget():
     policy = build_output_policy("normal", 123)
     assert policy.max_tokens == 123
