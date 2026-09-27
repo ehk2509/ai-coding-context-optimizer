@@ -363,6 +363,28 @@ The feature is disabled by default; no source is sent to a model unless it is
 explicitly enabled. See [Configuration](docs/CONFIGURATION.md) and
 [Security & privacy](SECURITY.md).
 
+## Multi-repository workspaces
+
+ACCO can federate retrieval across related repositories without merging them
+into one giant index:
+
+```bash
+acco workspace init ~/projects/product \
+  --repo frontend=~/projects/frontend \
+  --repo backend=~/projects/backend \
+  --repo shared=~/projects/shared
+
+acco workspace pack ~/projects/product \
+  --query "change the shared authentication response" \
+  --max-tokens 10000
+```
+
+Each repository keeps its normal structural/semantic index and exact-source
+ranking authority. The workspace layer scores repositories for the task,
+reserves a bounded slot for direct package dependencies, allocates one global
+token budget, and emits repository-prefixed provenance. See
+[Multi-repository workspaces](docs/commands/workspace.md).
+
 ## Hybrid semantic retrieval
 
 ACCO 1.10 adds opt-in **chunk-level semantic discovery** without turning
