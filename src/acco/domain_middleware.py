@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
 import json
 import math
 import re
@@ -316,8 +315,8 @@ def optimize_database_rows(
         for row in selected
     ]
     original = {
-        "columns": resolved_columns,
-        "rows": normalized,
+        "columns": columns,
+        "rows": rows,
     }
     candidate = {
         "columns": resolved_columns,
