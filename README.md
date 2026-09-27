@@ -1,4 +1,4 @@
-# ACCO — AI Coding Context Optimizer 1.21.0
+# ACCO — AI Coding Context Optimizer 1.22.0
 
 **ACCO (AI Coding Context Optimizer)** is a local context-optimization layer for AI coding agents. It reduces unnecessary source, tool-output, and always-on context while preserving exact code where the model needs it.
 
