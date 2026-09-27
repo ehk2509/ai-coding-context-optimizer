@@ -93,6 +93,28 @@ export class AccoClient {
     return this.request("POST", "/v1/output/optimize", payload);
   }
 
+  optimizeRag(documents, query = "", options = {}) {
+    return this.request("POST", "/v1/middleware/rag", {
+      documents,
+      query,
+      options,
+    });
+  }
+
+  optimizeApiPayload(payload, query = "", options = {}) {
+    return this.request("POST", "/v1/middleware/api", {
+      payload,
+      query,
+      options,
+    });
+  }
+
+  optimizeDatabaseRows(rows, query = "", columns = null, options = {}) {
+    const payload = { rows, query, options };
+    if (columns !== null) payload.columns = columns;
+    return this.request("POST", "/v1/middleware/database", payload);
+  }
+
   routeModel(prompt, options = {}) {
     return this.request("POST", "/v1/route", { prompt, options });
   }
@@ -164,6 +186,30 @@ export class AccoClient {
         return upstream(new Request(request, { ...init, body: encoded, headers }));
       }
       return upstream(input, { ...init, headers, body: encoded });
+    };
+  }
+
+  rag() {
+    return {
+      optimize: (documents, query = "", options = {}) =>
+        this.optimizeRag(documents, query, options),
+      recover: (handle) => this.recover(handle),
+    };
+  }
+
+  api() {
+    return {
+      optimize: (payload, query = "", options = {}) =>
+        this.optimizeApiPayload(payload, query, options),
+      recover: (handle) => this.recover(handle),
+    };
+  }
+
+  database() {
+    return {
+      optimize: (rows, query = "", columns = null, options = {}) =>
+        this.optimizeDatabaseRows(rows, query, columns, options),
+      recover: (handle) => this.recover(handle),
     };
   }
 
