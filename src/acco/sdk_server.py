@@ -169,6 +169,20 @@ class SdkApplication:
                 **self._options(body),
             )
 
+        if path == "/v1/context-budget":
+            prompt = body.get("prompt")
+            if not isinstance(prompt, str):
+                raise ValueError("prompt must be a string")
+            options = self._options(body)
+            total_tokens = options.pop("total_tokens", body.get("total_tokens"))
+            if not isinstance(total_tokens, int) or isinstance(total_tokens, bool):
+                raise ValueError("total_tokens must be an integer")
+            return 200, self.engine.plan_context_budget(
+                prompt,
+                total_tokens=total_tokens,
+                **options,
+            )
+
         if path == "/v1/route":
             prompt = body.get("prompt")
             if not isinstance(prompt, str):

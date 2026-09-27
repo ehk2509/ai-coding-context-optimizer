@@ -19,6 +19,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("-q", "--query", default="", help="task/bug/feature description")
     parser.add_argument("--max-tokens", type=int, default=6000)
     parser.add_argument("--max-files", type=int, default=12)
+    parser.add_argument(
+        "--context-budget",
+        type=int,
+        help=(
+            "optional total model-context budget; ACCO derives the source slice "
+            "while --max-tokens remains a hard source cap"
+        ),
+    )
     parser.add_argument("--context-lines", type=int, default=6)
     parser.add_argument("--no-gitignore", action="store_true")
     parser.add_argument("--no-changed-boost", action="store_true")
@@ -87,6 +95,7 @@ def main(argv: list[str] | None = None) -> int:
             embeddings=args.embeddings,
             target_symbol=args.target_symbol,
             closure_max_items=args.closure_items,
+            context_budget_total=args.context_budget,
         )
     except (ValueError, RuntimeError) as exc:
         print(str(exc), file=sys.stderr)
@@ -105,6 +114,7 @@ def main(argv: list[str] | None = None) -> int:
             "retrieval_plan": pack.retrieval_plan,
             "cache_hit": pack.cache_hit,
             "cache_key": pack.cache_key,
+            "context_budget_plan": pack.context_budget_plan,
             "semantic_index": (
                 repository.semantic_index_status() if args.embeddings else None
             ),

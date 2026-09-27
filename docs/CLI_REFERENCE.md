@@ -98,6 +98,7 @@ For machine-readable fields, see [Machine-readable CLI contracts](JSON_OUTPUTS.m
 - [`statusline`](commands/statusline.md) — render one fast live efficiency line.
 - [`cache-economics`](commands/cache-economics.md) — compare context rewrites after prompt-cache costs.
 - [`budget`](commands/budget.md) — compare measured context with budget guidance.
+- [`context-budget`](commands/context-budget.md) — allocate one total model-context envelope across source, history, memory, tool results, schemas, and reserve.
 - [`policy`](commands/policy.md) — generate lifecycle advice from transcripts.
 - [`status`](commands/status.md) — inspect ACCO's session ledger.
 - [`check`](commands/check.md) — CI context-budget/map-freshness check.

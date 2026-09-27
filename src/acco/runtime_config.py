@@ -85,6 +85,8 @@ class RuntimeSettings:
     provider_model_routing_mode: str = "off"
     provider_model_routing_calibration_file: str = DEFAULT_ROUTING_CALIBRATION_FILE
     provider_model_routing_min_savings: float = 0.05
+    context_budget_enabled: bool = False
+    context_budget_total_tokens: int = 12000
 
 
 def find_project_config(start: Path | None = None) -> Path | None:
@@ -207,6 +209,9 @@ def _load_file(start: Path | None = None) -> RuntimeSettings:
     provider = payload.get("provider", {})
     if not isinstance(provider, dict):
         raise ValueError(f"Expected [provider] table in ACCO config: {path}")
+    context_budget = payload.get("context_budget", {})
+    if not isinstance(context_budget, dict):
+        raise ValueError(f"Expected [context_budget] table in ACCO config: {path}")
     allow = hooks.get("allow", [])
     allow_tuple = (
         tuple(item for item in allow if isinstance(item, str))
@@ -382,6 +387,17 @@ def _load_file(start: Path | None = None) -> RuntimeSettings:
         provider_model_routing_min_savings=_fraction(
             provider.get("routing_min_savings"),
             0.05,
+        ),
+        context_budget_enabled=_bool(
+            context_budget.get("enabled"),
+            False,
+        ),
+        context_budget_total_tokens=max(
+            1000,
+            _positive_int(
+                context_budget.get("total_tokens"),
+                12000,
+            ),
         ),
     )
 
@@ -712,5 +728,17 @@ def settings_for(start: Path | None = None) -> RuntimeSettings:
             base.provider_model_routing_min_savings,
             minimum=0.0,
             maximum=1.0,
+        ),
+        context_budget_enabled=_env_bool(
+            "ACCO_CONTEXT_BUDGET",
+            base.context_budget_enabled,
+        ),
+        context_budget_total_tokens=int(
+            _env_int(
+                "ACCO_CONTEXT_BUDGET_TOTAL_TOKENS",
+                base.context_budget_total_tokens,
+                minimum=1000,
+            )
+            or base.context_budget_total_tokens
         ),
     )

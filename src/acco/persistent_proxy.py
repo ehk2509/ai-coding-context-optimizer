@@ -1000,6 +1000,11 @@ def run_profile(profile_id: str) -> int:
         ),
         model_routing_min_savings=settings.provider_model_routing_min_savings,
         instance_id=_runtime_instance_id(profile),
+        context_budget_total_tokens=(
+            settings.context_budget_total_tokens
+            if settings.context_budget_enabled
+            else None
+        ),
     ).validate()
     run_provider_proxy(config)
     return 0

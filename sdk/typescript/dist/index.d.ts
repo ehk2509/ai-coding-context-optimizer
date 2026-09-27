@@ -114,6 +114,17 @@ export interface RecoveryResult {
   access_count: number;
 }
 
+export interface ContextBudgetPlan {
+  total_tokens: number;
+  task: string;
+  complexity_tier: string;
+  risk_level: string;
+  allocations: Record<string, number>;
+  weights: Record<string, number>;
+  observed_tokens: Record<string, number>;
+  reasons: string[];
+}
+
 export interface ModelRouteDecision {
   [key: string]: unknown;
   selected_model: string | null;
@@ -191,6 +202,11 @@ export declare class AccoClient {
     columns?: string[] | null,
     options?: JsonObject,
   ): Promise<StructuredOptimization>;
+  planContextBudget(
+    prompt: string,
+    totalTokens: number,
+    options?: JsonObject,
+  ): Promise<ContextBudgetPlan>;
   routeModel(
     prompt: string,
     options?: JsonObject,

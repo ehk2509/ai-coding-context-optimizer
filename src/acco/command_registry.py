@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
+from .command_handlers.budget import context_budget_main
 from .command_handlers.context import (
     browse_main,
     feedback_main,
@@ -145,6 +146,7 @@ class CommandRegistry:
 DEFAULT_COMMAND_REGISTRY = CommandRegistry(
     [
         CommandSpec("pack", pack_main),
+        CommandSpec("context-budget", context_budget_main),
         CommandSpec("workspace", workspace_main),
         CommandSpec("impact", impact_main),
         CommandSpec("browse", browse_main),

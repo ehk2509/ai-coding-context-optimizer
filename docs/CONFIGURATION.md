@@ -72,6 +72,10 @@ compress_schemas = false
 [provider]
 prefix_tracking = true
 
+[context_budget]
+enabled = false
+total_tokens = 12000
+
 [tool_proxy]
 enabled = false
 provider = "ollama"
@@ -207,6 +211,31 @@ local and deterministic; it does not call an LLM.
 Persistent memory itself remains explicit. `memory_index` is the cheap metadata
 layer, `memory_search` adds bounded snippets, and `memory_get` returns full
 records by id. No raw conversation text is automatically persisted.
+
+## Whole-context budget
+
+The whole-context allocator is opt-in. It plans one model-context envelope
+across exact source, history, durable memory, historical tool results, tool
+schemas, and uncommitted reserve.
+
+| TOML key | Default | Meaning |
+|---|---:|---|
+| `context_budget.enabled` | `false` | Enable the planner for repository source packs and provider proxy transforms. |
+| `context_budget.total_tokens` | `12000` | Total model-context envelope used to derive component slices; minimum 1000. |
+
+Environment overrides:
+
+- `ACCO_CONTEXT_BUDGET=1`
+- `ACCO_CONTEXT_BUDGET_TOTAL_TOKENS=N`
+
+When enabled, source retrieval uses only the plan's `source` slice, while any
+explicit pack `max_tokens` remains an additional hard source ceiling. Provider
+interception uses observed schema and historical tool-output demand to decide
+whether those existing recoverable compressors should activate. It does not
+automatically rewrite arbitrary conversation history or inject project memory.
+
+Use `acco context-budget --total-tokens N` to inspect a plan before enabling
+runtime use.
 
 ## Provider prefix evidence and local proxy
 

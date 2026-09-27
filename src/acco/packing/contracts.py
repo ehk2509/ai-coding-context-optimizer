@@ -76,3 +76,4 @@ class ContextPack:
     retrieval_plan: dict[str, int] = field(default_factory=dict)
     cache_hit: bool = False
     cache_key: str | None = None
+    context_budget_plan: dict | None = None

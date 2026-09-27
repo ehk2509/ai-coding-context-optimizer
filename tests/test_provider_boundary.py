@@ -573,3 +573,163 @@ def test_prefix_tracking_recognizes_append_only_conversation_extension(
     assert extended.reused is True
     assert extended.reuse_mode == "extended"
     assert extended.element_count > initial.element_count
+
+
+
+def test_provider_context_budget_skips_schema_compression_when_slice_fits(
+    tmp_path, monkeypatch
+):
+    """Budget mode should not compress schemas merely because compression is available."""
+    monkeypatch.setenv("ACCO_STATE_DIR", str(tmp_path / "state"))
+    root = tmp_path / "repo"
+    root.mkdir()
+    description = "Search exact repository evidence. " * 20
+    tools = [
+        {
+            "name": "search_repo",
+            "description": description,
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": description}
+                },
+                "required": ["query"],
+            },
+        }
+    ]
+    body = {
+        "system": "coding",
+        "messages": [{"role": "user", "content": "Explain this helper."}],
+        "tools": tools,
+    }
+
+    result = transform_provider_request(
+        root,
+        "anthropic",
+        body,
+        compress_tool_results=False,
+        deduplicate_history=False,
+        prefix_tracking=False,
+        context_budget_total_tokens=100000,
+    )
+
+    assert result.body == body
+    assert result.changed is False
+    assert result.schema_recovery_handle is None
+    assert result.context_budget is not None
+    assert result.context_budget["observed_tokens"]["schemas"] > 0
+
+
+def test_provider_context_budget_compresses_schema_when_slice_is_over_budget(
+    tmp_path, monkeypatch
+):
+    """An over-budget schema slice should activate the existing recoverable compressor."""
+    monkeypatch.setenv("ACCO_STATE_DIR", str(tmp_path / "state"))
+    root = tmp_path / "repo"
+    root.mkdir()
+    description = "Search exact repository evidence. " * 80
+    tools = [
+        {
+            "name": "search_repo",
+            "description": description,
+            "input_schema": {
+                "type": "object",
+                "title": "drop",
+                "properties": {
+                    "query": {"type": "string", "description": description}
+                },
+                "required": ["query"],
+            },
+        }
+    ]
+    body = {
+        "system": "coding",
+        "messages": [{"role": "user", "content": "Implement this tool integration."}],
+        "tools": tools,
+    }
+
+    result = transform_provider_request(
+        root,
+        "anthropic",
+        body,
+        compress_tool_results=False,
+        deduplicate_history=False,
+        prefix_tracking=False,
+        context_budget_total_tokens=2000,
+    )
+
+    assert result.changed is True
+    assert result.schema_recovery_handle
+    assert result.body["tools"] != tools
+    assert (
+        result.context_budget["observed_tokens"]["schemas"]
+        > result.context_budget["allocations"]["schemas"]
+    )
+
+
+def test_provider_context_budget_only_compresses_tool_history_when_over_slice(
+    tmp_path, monkeypatch
+):
+    """Historical tool compression pressure should come from observed demand vs slice."""
+    monkeypatch.setenv("ACCO_STATE_DIR", str(tmp_path / "state"))
+    root = tmp_path / "repo"
+    root.mkdir()
+    historical = _noise("pytest", rows=260)
+    body = {
+        "messages": [
+            {"role": "tool", "content": historical},
+            {"role": "user", "content": "Debug the failing parser."},
+        ]
+    }
+
+    roomy = transform_provider_request(
+        root,
+        "openai",
+        body,
+        compress_schemas=False,
+        deduplicate_history=False,
+        prefix_tracking=False,
+        tool_result_min_tokens=100,
+        context_budget_total_tokens=100000,
+    )
+    assert roomy.changed is False
+    assert roomy.body == body
+
+    constrained = transform_provider_request(
+        root,
+        "openai",
+        body,
+        compress_schemas=False,
+        deduplicate_history=False,
+        prefix_tracking=False,
+        tool_result_min_tokens=100,
+        context_budget_total_tokens=2000,
+    )
+    assert constrained.changed is True
+    assert constrained.transformed_segments == 1
+    assert constrained.recovery_handles
+    assert (
+        constrained.context_budget["observed_tokens"]["tool_results"]
+        > constrained.context_budget["allocations"]["tool_results"]
+    )
+
+
+def test_provider_default_has_no_whole_context_budget_metadata(
+    tmp_path, monkeypatch
+):
+    """Existing provider behavior stays unbudgeted until explicitly enabled."""
+    monkeypatch.setenv("ACCO_STATE_DIR", str(tmp_path / "state"))
+    root = tmp_path / "repo"
+    root.mkdir()
+    result = transform_provider_request(
+        root,
+        "openai",
+        {"messages": [{"role": "user", "content": "hello"}]},
+        compress_schemas=False,
+        compress_tool_results=False,
+        deduplicate_history=False,
+        prefix_tracking=False,
+    )
+
+    assert result.context_budget is None
+    assert result.metadata()["context_budget"] is None

@@ -114,6 +114,17 @@ export interface RecoveryResult {
   access_count: number;
 }
 
+export interface ContextBudgetPlan {
+  total_tokens: number;
+  task: string;
+  complexity_tier: string;
+  risk_level: string;
+  allocations: Record<string, number>;
+  weights: Record<string, number>;
+  observed_tokens: Record<string, number>;
+  reasons: string[];
+}
+
 export interface ModelRouteDecision {
   [key: string]: unknown;
   selected_model: string | null;
@@ -303,6 +314,18 @@ export class AccoClient {
     };
     if (columns !== null) payload.columns = columns;
     return this.request("POST", "/v1/middleware/database", payload);
+  }
+
+  planContextBudget(
+    prompt: string,
+    totalTokens: number,
+    options?: JsonObject,
+  ): Promise<ContextBudgetPlan> {
+    return this.request("POST", "/v1/context-budget", {
+      prompt,
+      total_tokens: totalTokens,
+      options,
+    });
   }
 
   routeModel(
