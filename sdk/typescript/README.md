@@ -69,3 +69,31 @@ const focused = await acco.optimizeBrowser(
 
 This is context optimization only: ACCO does not navigate, fetch URLs, execute
 page JavaScript, or inspect screenshots.
+
+
+## Optional RAG / API / database middleware
+
+These are context-compression adapters, not data-access clients. ACCO never runs
+retrieval, network requests, SQL, or database connections for these methods.
+
+```ts
+const rag = await acco.rag().optimize(
+  retrievedDocuments,
+  question,
+  { max_documents: 8 },
+);
+
+const api = await acco.api().optimize(apiJson, question);
+
+const rows = await acco.database().optimize(
+  databaseRows,
+  "blocked",
+  ["id", "name", "status"],
+  { max_rows: 20 },
+);
+```
+
+The compressed `value` is intended for LLM/model context. It is not guaranteed
+to preserve the original business payload schema after compression. When
+`changed=true`, `recovery_handle` restores the exact deterministic
+canonical-JSON representation accepted by ACCO.
