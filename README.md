@@ -1,4 +1,4 @@
-# ACCO — AI Coding Context Optimizer 1.20.0
+# ACCO — AI Coding Context Optimizer 1.21.0
 
 **ACCO (AI Coding Context Optimizer)** is a local context-optimization layer for AI coding agents. It reduces unnecessary source, tool-output, and always-on context while preserving exact code where the model needs it.
 
@@ -212,7 +212,24 @@ const prepared = await middleware.beforeRequest(requestBody);
 Both SDKs share the production provider transform, context router,
 command-output processors, deterministic model routing, and content-addressed
 exact recovery. The TypeScript path deliberately does not duplicate those
-algorithms in JavaScript. See [Middleware SDKs](docs/SDK.md).
+algorithms in JavaScript.
+
+Optional structured-data adapters reuse that same engine without changing the
+coding-first product flow:
+
+```python
+rag = acco.rag().optimize(retrieved_documents, query=user_prompt)
+api = acco.api().optimize(api_json, query=user_prompt)
+rows = acco.database().optimize(
+    database_rows,
+    columns=["id", "name", "status"],
+    query=user_prompt,
+)
+```
+
+These adapters operate only on caller-supplied data already in memory: they do
+not retrieve documents, fetch APIs, open databases, or execute SQL. See
+[Middleware SDKs](docs/SDK.md).
 
 ## Cost intelligence and efficiency advisor
 
