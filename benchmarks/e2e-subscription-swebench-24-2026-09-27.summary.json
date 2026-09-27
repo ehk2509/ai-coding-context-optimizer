@@ -1,0 +1,595 @@
+{
+  "schema": 1,
+  "status": "development-evidence",
+  "not_a_publishable_claim_because": [
+    "suite task definitions not frozen (paths/runner adapted for local subscription runs)",
+    "ACCO success count is one run lower than plain Claude Code, so acco benchmark withholds the headline"
+  ],
+  "run_dates": "2026-09-25/2026-09-27",
+  "design": {
+    "tasks": 24,
+    "trials_per_task": 3,
+    "conditions": [
+      "claude_code",
+      "acco"
+    ],
+    "total_runs": 144,
+    "condition_order_seed": 20260919
+  },
+  "agent": {
+    "host": "Claude Code 2.1.276",
+    "model": "claude-sonnet-5",
+    "auth": "Claude Pro subscription (claude_docker --auth subscription)",
+    "environment": "SWE-bench task image per task (claude_docker --task-image), snapshot mounted at /testbed",
+    "acco_commit": "4856959",
+    "acco_arm": "acco setup --host claude defaults (hooks, MCP, skill, output policy); provider proxy not enabled",
+    "baseline_arm": "plain Claude Code, ACCO_DISABLED=1"
+  },
+  "grading": "SWE-bench official image, hidden tests applied after the agent; agent test-file edits stripped",
+  "pricing": {
+    "file": "benchmarks/claude-sonnet-5-rates-2026-09-19.json",
+    "note": "equivalent API cost from transcript usage; not the subscription bill"
+  },
+  "totals": {
+    "claude_code": {
+      "run_count": 72,
+      "successes": 56,
+      "success_rate": 0.7777777777777778,
+      "input_tokens": 74996746,
+      "output_tokens": 776714,
+      "total_tokens": 75773460,
+      "cached_input_tokens": 73062926,
+      "tool_calls": 1517,
+      "model_calls": 1583,
+      "total_cost_usd": 29.879614200000002,
+      "cost_per_run_usd": 0.4149946416666667,
+      "cost_per_success_usd": 0.5335645392857143,
+      "mean_latency_ms": 199049.70716762668,
+      "median_latency_ms": 121875.79617742449
+    },
+    "acco": {
+      "run_count": 72,
+      "successes": 55,
+      "success_rate": 0.7638888888888888,
+      "input_tokens": 55744448,
+      "output_tokens": 623378,
+      "total_tokens": 56367826,
+      "cached_input_tokens": 54157373,
+      "tool_calls": 1191,
+      "model_calls": 1261,
+      "total_cost_usd": 23.164096100000002,
+      "cost_per_run_usd": 0.3217235569444445,
+      "cost_per_success_usd": 0.4211653836363637,
+      "mean_latency_ms": 165266.05987838574,
+      "median_latency_ms": 99537.89960127324
+    }
+  },
+  "delta": {
+    "input_token_reduction": 0.256708444390374,
+    "output_token_reduction": 0.1974162948009177,
+    "total_token_reduction": 0.25610067165997175,
+    "cost_reduction": 0.22475250366519128,
+    "cost_per_success_reduction": 0.21065709464092197,
+    "latency_reduction": 0.16972467716714879,
+    "success_rate_change": -0.01388888888888895,
+    "tool_call_change": -326,
+    "model_call_change": -322
+  },
+  "confidence_95": {
+    "total_token_reduction": [
+      0.18044278907694766,
+      0.3252315976118093
+    ],
+    "cost_reduction": [
+      0.1504714679665191,
+      0.29555132436024867
+    ],
+    "success_rate_change": [
+      -0.09722222222222221,
+      0.06944444444444442
+    ],
+    "cost_per_success_reduction": [
+      0.0966678024655101,
+      0.314257910471719
+    ]
+  },
+  "confidence_method": "cluster bootstrap over tasks, 2000 resamples, seed 0, 95% percentile interval",
+  "outcomes": {
+    "both_success": 51,
+    "improved_tasks": [
+      "astropy__astropy-14598#2",
+      "mwaskom__seaborn-3069#2",
+      "psf__requests-5414#2",
+      "psf__requests-6028#1"
+    ],
+    "regressed_tasks": [
+      "mwaskom__seaborn-3187#2",
+      "mwaskom__seaborn-3187#3",
+      "psf__requests-5414#3",
+      "pydata__xarray-6599#2",
+      "pylint-dev__pylint-6386#1"
+    ]
+  },
+  "tasks": [
+    {
+      "task": "astropy__astropy-13033",
+      "claude_code": {
+        "runs": 3,
+        "successes": 0,
+        "cost_usd": 0.5287,
+        "model_calls": 31,
+        "input_tokens": 1060942,
+        "output_tokens": 14549
+      },
+      "acco": {
+        "runs": 3,
+        "successes": 0,
+        "cost_usd": 0.5877,
+        "model_calls": 37,
+        "input_tokens": 1270705,
+        "output_tokens": 15743
+      },
+      "cost_change": 0.1116
+    },
+    {
+      "task": "astropy__astropy-14096",
+      "claude_code": {
+        "runs": 3,
+        "successes": 3,
+        "cost_usd": 0.9702,
+        "model_calls": 45,
+        "input_tokens": 1732796,
+        "output_tokens": 37062
+      },
+      "acco": {
+        "runs": 3,
+        "successes": 3,
+        "cost_usd": 0.7722,
+        "model_calls": 34,
+        "input_tokens": 1244637,
+        "output_tokens": 28309
+      },
+      "cost_change": -0.2041
+    },
+    {
+      "task": "astropy__astropy-14309",
+      "claude_code": {
+        "runs": 3,
+        "successes": 3,
+        "cost_usd": 0.5717,
+        "model_calls": 45,
+        "input_tokens": 1555515,
+        "output_tokens": 7930
+      },
+      "acco": {
+        "runs": 3,
+        "successes": 3,
+        "cost_usd": 0.3347,
+        "model_calls": 25,
+        "input_tokens": 813281,
+        "output_tokens": 4584
+      },
+      "cost_change": -0.4146
+    },
+    {
+      "task": "astropy__astropy-14598",
+      "claude_code": {
+        "runs": 3,
+        "successes": 0,
+        "cost_usd": 2.6635,
+        "model_calls": 104,
+        "input_tokens": 5855773,
+        "output_tokens": 85582
+      },
+      "acco": {
+        "runs": 3,
+        "successes": 1,
+        "cost_usd": 2.429,
+        "model_calls": 82,
+        "input_tokens": 5077205,
+        "output_tokens": 85203
+      },
+      "cost_change": -0.088
+    },
+    {
+      "task": "mwaskom__seaborn-3069",
+      "claude_code": {
+        "runs": 3,
+        "successes": 2,
+        "cost_usd": 2.9007,
+        "model_calls": 128,
+        "input_tokens": 7822443,
+        "output_tokens": 68288
+      },
+      "acco": {
+        "runs": 3,
+        "successes": 3,
+        "cost_usd": 2.3104,
+        "model_calls": 114,
+        "input_tokens": 5773234,
+        "output_tokens": 63337
+      },
+      "cost_change": -0.2035
+    },
+    {
+      "task": "mwaskom__seaborn-3187",
+      "claude_code": {
+        "runs": 3,
+        "successes": 3,
+        "cost_usd": 2.1963,
+        "model_calls": 118,
+        "input_tokens": 5875961,
+        "output_tokens": 56167
+      },
+      "acco": {
+        "runs": 3,
+        "successes": 1,
+        "cost_usd": 1.5234,
+        "model_calls": 85,
+        "input_tokens": 3764872,
+        "output_tokens": 41673
+      },
+      "cost_change": -0.3064
+    },
+    {
+      "task": "psf__requests-1142",
+      "claude_code": {
+        "runs": 3,
+        "successes": 3,
+        "cost_usd": 0.4136,
+        "model_calls": 32,
+        "input_tokens": 1005469,
+        "output_tokens": 7709
+      },
+      "acco": {
+        "runs": 3,
+        "successes": 3,
+        "cost_usd": 0.4238,
+        "model_calls": 31,
+        "input_tokens": 1019349,
+        "output_tokens": 7479
+      },
+      "cost_change": 0.0247
+    },
+    {
+      "task": "psf__requests-2931",
+      "claude_code": {
+        "runs": 3,
+        "successes": 3,
+        "cost_usd": 1.0258,
+        "model_calls": 77,
+        "input_tokens": 2773973,
+        "output_tokens": 23400
+      },
+      "acco": {
+        "runs": 3,
+        "successes": 3,
+        "cost_usd": 0.9372,
+        "model_calls": 67,
+        "input_tokens": 2430794,
+        "output_tokens": 21895
+      },
+      "cost_change": -0.0864
+    },
+    {
+      "task": "psf__requests-5414",
+      "claude_code": {
+        "runs": 3,
+        "successes": 2,
+        "cost_usd": 1.1566,
+        "model_calls": 72,
+        "input_tokens": 2875428,
+        "output_tokens": 28651
+      },
+      "acco": {
+        "runs": 3,
+        "successes": 2,
+        "cost_usd": 0.9528,
+        "model_calls": 58,
+        "input_tokens": 2222335,
+        "output_tokens": 25637
+      },
+      "cost_change": -0.1762
+    },
+    {
+      "task": "psf__requests-6028",
+      "claude_code": {
+        "runs": 3,
+        "successes": 1,
+        "cost_usd": 2.7325,
+        "model_calls": 113,
+        "input_tokens": 6703459,
+        "output_tokens": 86252
+      },
+      "acco": {
+        "runs": 3,
+        "successes": 2,
+        "cost_usd": 1.7168,
+        "model_calls": 89,
+        "input_tokens": 4662308,
+        "output_tokens": 44810
+      },
+      "cost_change": -0.3717
+    },
+    {
+      "task": "pydata__xarray-6461",
+      "claude_code": {
+        "runs": 3,
+        "successes": 3,
+        "cost_usd": 0.9612,
+        "model_calls": 67,
+        "input_tokens": 2689545,
+        "output_tokens": 19660
+      },
+      "acco": {
+        "runs": 3,
+        "successes": 3,
+        "cost_usd": 0.4698,
+        "model_calls": 34,
+        "input_tokens": 1147244,
+        "output_tokens": 10076
+      },
+      "cost_change": -0.5112
+    },
+    {
+      "task": "pydata__xarray-6599",
+      "claude_code": {
+        "runs": 3,
+        "successes": 3,
+        "cost_usd": 4.5802,
+        "model_calls": 147,
+        "input_tokens": 10328890,
+        "output_tokens": 156960
+      },
+      "acco": {
+        "runs": 3,
+        "successes": 2,
+        "cost_usd": 4.1014,
+        "model_calls": 134,
+        "input_tokens": 9122682,
+        "output_tokens": 147852
+      },
+      "cost_change": -0.1045
+    },
+    {
+      "task": "pydata__xarray-7393",
+      "claude_code": {
+        "runs": 3,
+        "successes": 3,
+        "cost_usd": 0.7778,
+        "model_calls": 60,
+        "input_tokens": 2297629,
+        "output_tokens": 14797
+      },
+      "acco": {
+        "runs": 3,
+        "successes": 3,
+        "cost_usd": 0.6056,
+        "model_calls": 49,
+        "input_tokens": 1774206,
+        "output_tokens": 10241
+      },
+      "cost_change": -0.2214
+    },
+    {
+      "task": "pylint-dev__pylint-4661",
+      "claude_code": {
+        "runs": 3,
+        "successes": 0,
+        "cost_usd": 1.3915,
+        "model_calls": 90,
+        "input_tokens": 3814097,
+        "output_tokens": 30349
+      },
+      "acco": {
+        "runs": 3,
+        "successes": 0,
+        "cost_usd": 0.7343,
+        "model_calls": 50,
+        "input_tokens": 1825882,
+        "output_tokens": 16560
+      },
+      "cost_change": -0.4723
+    },
+    {
+      "task": "pylint-dev__pylint-4970",
+      "claude_code": {
+        "runs": 3,
+        "successes": 0,
+        "cost_usd": 2.2259,
+        "model_calls": 120,
+        "input_tokens": 6377600,
+        "output_tokens": 44225
+      },
+      "acco": {
+        "runs": 3,
+        "successes": 0,
+        "cost_usd": 1.3769,
+        "model_calls": 88,
+        "input_tokens": 3694423,
+        "output_tokens": 30085
+      },
+      "cost_change": -0.3814
+    },
+    {
+      "task": "pylint-dev__pylint-6386",
+      "claude_code": {
+        "runs": 3,
+        "successes": 3,
+        "cost_usd": 1.8338,
+        "model_calls": 113,
+        "input_tokens": 4938451,
+        "output_tokens": 42132
+      },
+      "acco": {
+        "runs": 3,
+        "successes": 2,
+        "cost_usd": 1.1093,
+        "model_calls": 84,
+        "input_tokens": 3146304,
+        "output_tokens": 21518
+      },
+      "cost_change": -0.3951
+    },
+    {
+      "task": "pytest-dev__pytest-5262",
+      "claude_code": {
+        "runs": 3,
+        "successes": 3,
+        "cost_usd": 0.2778,
+        "model_calls": 23,
+        "input_tokens": 717738,
+        "output_tokens": 3632
+      },
+      "acco": {
+        "runs": 3,
+        "successes": 3,
+        "cost_usd": 0.2894,
+        "model_calls": 21,
+        "input_tokens": 685395,
+        "output_tokens": 3678
+      },
+      "cost_change": 0.0418
+    },
+    {
+      "task": "pytest-dev__pytest-5809",
+      "claude_code": {
+        "runs": 3,
+        "successes": 3,
+        "cost_usd": 0.2645,
+        "model_calls": 25,
+        "input_tokens": 740099,
+        "output_tokens": 3425
+      },
+      "acco": {
+        "runs": 3,
+        "successes": 3,
+        "cost_usd": 0.2706,
+        "model_calls": 24,
+        "input_tokens": 734626,
+        "output_tokens": 3248
+      },
+      "cost_change": 0.0231
+    },
+    {
+      "task": "pytest-dev__pytest-7324",
+      "claude_code": {
+        "runs": 3,
+        "successes": 3,
+        "cost_usd": 0.8582,
+        "model_calls": 51,
+        "input_tokens": 1944068,
+        "output_tokens": 23683
+      },
+      "acco": {
+        "runs": 3,
+        "successes": 3,
+        "cost_usd": 0.8648,
+        "model_calls": 53,
+        "input_tokens": 2090467,
+        "output_tokens": 21500
+      },
+      "cost_change": 0.0077
+    },
+    {
+      "task": "pytest-dev__pytest-7521",
+      "claude_code": {
+        "runs": 3,
+        "successes": 3,
+        "cost_usd": 0.4766,
+        "model_calls": 31,
+        "input_tokens": 1117275,
+        "output_tokens": 7011
+      },
+      "acco": {
+        "runs": 3,
+        "successes": 3,
+        "cost_usd": 0.4329,
+        "model_calls": 28,
+        "input_tokens": 974636,
+        "output_tokens": 7801
+      },
+      "cost_change": -0.0917
+    },
+    {
+      "task": "scikit-learn__scikit-learn-12585",
+      "claude_code": {
+        "runs": 3,
+        "successes": 3,
+        "cost_usd": 0.2126,
+        "model_calls": 16,
+        "input_tokens": 470880,
+        "output_tokens": 2673
+      },
+      "acco": {
+        "runs": 3,
+        "successes": 3,
+        "cost_usd": 0.2017,
+        "model_calls": 15,
+        "input_tokens": 456875,
+        "output_tokens": 2969
+      },
+      "cost_change": -0.0513
+    },
+    {
+      "task": "scikit-learn__scikit-learn-13439",
+      "claude_code": {
+        "runs": 3,
+        "successes": 3,
+        "cost_usd": 0.1842,
+        "model_calls": 15,
+        "input_tokens": 439666,
+        "output_tokens": 2285
+      },
+      "acco": {
+        "runs": 3,
+        "successes": 3,
+        "cost_usd": 0.2125,
+        "model_calls": 17,
+        "input_tokens": 519671,
+        "output_tokens": 2487
+      },
+      "cost_change": 0.1536
+    },
+    {
+      "task": "scikit-learn__scikit-learn-14141",
+      "claude_code": {
+        "runs": 3,
+        "successes": 3,
+        "cost_usd": 0.2981,
+        "model_calls": 29,
+        "input_tokens": 875851,
+        "output_tokens": 3468
+      },
+      "acco": {
+        "runs": 3,
+        "successes": 3,
+        "cost_usd": 0.2198,
+        "model_calls": 19,
+        "input_tokens": 573304,
+        "output_tokens": 2247
+      },
+      "cost_change": -0.2627
+    },
+    {
+      "task": "scikit-learn__scikit-learn-14496",
+      "claude_code": {
+        "runs": 3,
+        "successes": 3,
+        "cost_usd": 0.3774,
+        "model_calls": 31,
+        "input_tokens": 983198,
+        "output_tokens": 6824
+      },
+      "acco": {
+        "runs": 3,
+        "successes": 3,
+        "cost_usd": 0.2873,
+        "model_calls": 23,
+        "input_tokens": 720013,
+        "output_tokens": 4446
+      },
+      "cost_change": -0.2387
+    }
+  ]
+}

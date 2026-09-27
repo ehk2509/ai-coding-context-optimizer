@@ -1423,6 +1423,10 @@ No real-world token savings percentage is claimed beyond the private-diff
 review and the external holdout benchmark described above, both explicitly
 hedged (single diff; six tasks across two repositories), and the paired
 coding-agent trials explicitly demonstrated no reliable cost effect either
-way rather than a savings claim. Synthetic and unit tests exercise
+way rather than a savings claim. A later 144-run paired SWE-bench run on a
+Claude subscription (ACCO `4856959`, 24 tasks × 3 trials) measured −21.1% cost
+per success (task-cluster 95% CI 9.7–31.4%) with 55/72 vs 56/72 solved; it is
+recorded as development evidence only (unfrozen suite, success one run lower)
+in `benchmarks/e2e-subscription-swebench-24-2026-09-27.md`. Synthetic and unit tests exercise
 mechanics and validation, not general product efficacy. See BENCHMARKING.md
 for live integration and paired-task measurement procedures.
