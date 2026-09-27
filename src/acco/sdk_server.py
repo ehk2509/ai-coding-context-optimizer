@@ -135,6 +135,40 @@ class SdkApplication:
                 **options,
             )
 
+        if path == "/v1/middleware/rag":
+            documents = body.get("documents")
+            if not isinstance(documents, list):
+                raise ValueError("documents must be a JSON array")
+            return 200, self.engine.optimize_rag(
+                documents,
+                query=str(body.get("query") or ""),
+                **self._options(body),
+            )
+
+        if path == "/v1/middleware/api":
+            api_payload = body.get("payload")
+            if not isinstance(api_payload, (dict, list)):
+                raise ValueError("payload must be a JSON object or array")
+            return 200, self.engine.optimize_api_payload(
+                api_payload,
+                query=str(body.get("query") or ""),
+                **self._options(body),
+            )
+
+        if path == "/v1/middleware/database":
+            rows = body.get("rows")
+            if not isinstance(rows, list):
+                raise ValueError("rows must be a JSON array")
+            columns = body.get("columns")
+            if columns is not None and not isinstance(columns, list):
+                raise ValueError("columns must be a JSON array")
+            return 200, self.engine.optimize_database_rows(
+                rows,
+                query=str(body.get("query") or ""),
+                columns=columns,
+                **self._options(body),
+            )
+
         if path == "/v1/route":
             prompt = body.get("prompt")
             if not isinstance(prompt, str):
