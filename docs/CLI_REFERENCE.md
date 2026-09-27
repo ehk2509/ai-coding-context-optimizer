@@ -49,6 +49,7 @@ For machine-readable fields, see [Machine-readable CLI contracts](JSON_OUTPUTS.m
 ## Repository context and navigation
 
 - [`pack`](commands/pack.md) — build a bounded task-aware context pack.
+- [`workspace`](commands/workspace.md) — federate bounded retrieval across multiple repositories with one global token budget and explicit provenance.
 - [`browse`](commands/browse.md) — inspect ranked candidates/symbols/previews.
 - [`impact`](commands/impact.md) — analyze callers/dependencies/tests.
 - [`feedback`](commands/feedback.md) — record ranking feedback.

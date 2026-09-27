@@ -93,6 +93,7 @@ from .command_handlers.patch import pack_diff_main, review_main
 from .command_handlers.persistent_proxy import proxy_main
 from .command_handlers.pricing import pricing_main
 from .command_handlers.sdk import sdk_serve_main
+from .command_handlers.workspace import workspace_main
 from .pack_cli import main as pack_main
 from .command_handlers.product import (
     advanced_main,
@@ -144,6 +145,7 @@ class CommandRegistry:
 DEFAULT_COMMAND_REGISTRY = CommandRegistry(
     [
         CommandSpec("pack", pack_main),
+        CommandSpec("workspace", workspace_main),
         CommandSpec("impact", impact_main),
         CommandSpec("browse", browse_main),
         CommandSpec("feedback", feedback_main),

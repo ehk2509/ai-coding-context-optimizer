@@ -185,6 +185,15 @@ layer. Their input is data the caller already owns in memory, and accepted
 lossy representations remain recovery-gated exactly like other SDK context
 transforms.
 
+## Workspace federation
+
+`workspace.py` sits above `RepositoryContextService`; it does not create a
+second source index. Each registered repository is scored through its existing
+ranking pipeline, then receives a bounded share of one workspace token budget.
+Package manifests contribute only cross-repository identity/dependency hints.
+Final source remains exact repository-local pack output with repository
+provenance retained in the combined context.
+
 ## Repository application boundary
 
 `RepositoryContextService` is the shared application layer for repository-aware
