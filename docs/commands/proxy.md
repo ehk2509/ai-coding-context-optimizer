@@ -27,7 +27,10 @@ acco proxy uninstall [PATH] [--json]
     acco proxy uninstall .
 
 Current automatic persistent attachment is intentionally limited to **Claude
-Code** and **Codex**. Other hosts continue to use acco wrap until ACCO has a
+Code** and **Codex**. `acco transport-status` is the authoritative capability
+registry for provider-boundary attachment: it distinguishes automatic,
+environment-only, manual-setting, and unsupported persistence instead of
+pretending every detected host has the same transport contract. Other hosts continue to use acco wrap until ACCO has a
 stable documented way to persist their provider routing without editing private
 state or persisting credentials.
 
