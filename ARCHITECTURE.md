@@ -39,6 +39,7 @@ deterministic transform
   ├── MCP schema compression
   ├── historical tool-output compression
   ├── browser payload focusing
+  ├── optional RAG/API/database context compression
   └── hook output compression
         ↓
 RecoveryStore.put(exact original) ──→ tsr_<sha256-prefix>
@@ -62,6 +63,12 @@ shapes; ordinary JSON/log/table/search output continues through the general
 router. The SDK bridge exposes the same implementation at
 `/v1/browser/optimize`.
 
+`domain_middleware.py` is another optional edge over caller-supplied
+JSON-compatible data. It adapts already-retrieved RAG documents, API payloads,
+or database/query rows into bounded model-context representations, then uses the
+same token/byte reduction gates and `RecoveryStore`. It has no retrieval,
+network, database, ORM, or SQL execution authority.
+
 Provider interception is kept at an explicit edge.
 `provider_boundary.py` classifies Anthropic/OpenAI/Gemini request shapes and
 identifies only historical tool/function-result surfaces. `provider_transform.py`
@@ -77,6 +84,13 @@ JSON/SSE response bytes for provider-reported token/model counters and writes
 only content-free telemetry; it is not allowed to rewrite provider responses.
 The TypeScript SDK's `interceptFetch` is another thin edge adapter over the same
 Python transform rather than a second optimization implementation.
+
+`wrapper.py` and `wrap_adapters.py` own foreground host launch/interception
+policy. `persistent_proxy.py` owns durable project/provider profiles, native
+user-session supervisor lifecycle, stable port reservation, instance-identified
+readiness, and reversible Claude/Codex routing. These modules do not gain
+repository ranking authority; they only choose how supported host traffic
+reaches the existing provider transform.
 
 Stable-prefix accounting stores hashes/sizes/counters through
 `prefix_cache.py`; it never becomes repository truth. The closed-loop
@@ -103,6 +117,7 @@ Command implementations are grouped vertically under
 - `output.py` — output policy, compaction, replay, explain, and benchmarks;
 - `optimization.py` — recovery, provider proxy, browser focusing, prefix evidence, and closed-loop optimization;
 - `sdk.py` — loopback bridge lifecycle for non-Python agent SDK clients;
+- `persistent_proxy.py` — persistent proxy install/status/start/stop/uninstall lifecycle;
 - `patch.py` — diff-context packing and patch review.
 
 The registry imports these handlers directly. `acco.commands` is retained
@@ -112,12 +127,19 @@ instead of rebuilding a central CLI monolith.
 
 ## Integration lifecycle boundary
 
-`integration_setup.py` owns host discovery and safe configuration mutation for
-Claude Code, Cursor, and Codex. It only creates/replaces ACCO-owned
+`integration_setup.py` owns host discovery and safe MCP/setup configuration
+mutation across supported coding agents. It only creates/replaces ACCO-owned
 entries: JSON MCP configuration is merged by key, Claude hook removal preserves
-unrelated commands, and Codex uses an explicit managed TOML block. Multi-host
-setup preflights all target files before the first write so one conflict cannot
-leave an earlier host partially configured.
+unrelated commands, and managed TOML/registry surfaces retain unrelated host
+state. Multi-host setup preflights target files before the first write so one
+conflict cannot leave an earlier host partially configured.
+
+Provider-boundary attachment is deliberately separate from MCP/setup lifecycle:
+`wrap_adapters.py` uses documented host contracts for foreground Copilot,
+Cursor, and OpenClaw interception, while `persistent_proxy.py` currently owns
+durable automatic attachment only for Claude Code and Codex. Unsupported or
+ambiguous provider routes fail closed instead of mutating undocumented host
+state.
 
 `runtime_config.py` resolves the nearest project `.acco.toml` and then
 applies `ACCO_*` environment overrides. Claude's adapter and read guard
@@ -156,6 +178,12 @@ The SDK bridge is not a provider proxy and does not hold provider credentials.
 Callers keep ownership of provider authentication, retries, streaming, and
 execution. The bridge binds to loopback by default and requires an explicit
 operator override for non-loopback exposure.
+
+The optional `rag()`, `api()`, and `database()` facades are application
+adapters over the same `AccoEngine`; they do not create a generic data-access
+layer. Their input is data the caller already owns in memory, and accepted
+lossy representations remain recovery-gated exactly like other SDK context
+transforms.
 
 ## Repository application boundary
 

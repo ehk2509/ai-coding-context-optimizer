@@ -1,4 +1,44 @@
-# Validation for 1.20.0
+# Validation for 1.21.0
+
+## 1.21 persistent provider runtime and optional domain middleware
+
+Version 1.21 expands ACCO's provider-boundary product and SDK surface without
+changing retrieval/ranking authority.
+
+Mechanical validation now covers:
+
+- broader `acco wrap` inference for provider-aware arbitrary CLIs, preserving
+  custom upstream gateways and refusing ambiguous multi-provider environments;
+- documented GitHub Copilot BYOK environment routing, including Azure base-URL
+  semantics, plus Cursor's manual documented BYOK bridge instead of private
+  settings mutation;
+- OpenClaw direct-provider wrapping through temporary sibling config overlays,
+  with exact catalog metadata, cleanup after exit, and fail-closed handling for
+  OAuth/native/custom transports, implicit runtime ambiguity, or fallbacks that
+  could bypass ACCO;
+- project/provider persistent proxy profiles with stable port reservation,
+  credential-free manifests, verified instance health before host mutation,
+  runtime-policy parity with `.acco.toml`, and current-user autostart on Linux,
+  macOS, and Windows;
+- reversible project-scoped Claude/Codex attachment, ownership preflights,
+  invalid-config refusal, native-service restart on reconfiguration, upgrade-
+  stable launcher paths, and transactional rollback on multi-provider failure;
+- Python and TypeScript RAG/API/database middleware over caller-supplied
+  JSON-compatible data, sharing the production JSON compactor, minimum-
+  reduction gates, and exact canonical-JSON recovery;
+- recovery-capacity fail-open behavior and strict JSON validation so structured
+  middleware never silently stringifies arbitrary application objects.
+
+The full 19-job CI matrix remains a release gate across Python 3.10/3.12/3.13,
+native Windows, TypeScript SDK, Rust/HNSW parity, ranking regression, frozen
+holdout, real CLI-output corpora, and standalone Linux/macOS/Windows x86_64 and
+ARM64 smoke tests.
+
+These checks establish lifecycle, safety, recovery, and cross-platform
+mechanics. They do **not** establish that persistent proxy mode or the optional
+RAG/API/database adapters improve end-to-end coding task success or reduce
+production cost per success. Those claims still require fresh paired workloads
+with independent verification and provider-complete usage accounting.
 
 ## 1.20 native distribution and trust surface
 

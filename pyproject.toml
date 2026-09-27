@@ -1,6 +1,6 @@
 [project]
 name = "acco"
-version = "1.20.0"
+version = "1.21.0"
 dependencies = ["tomli>=2; python_version < '3.11'", "tree-sitter>=0.25,<0.26", "tree-sitter-javascript>=0.25,<0.26", "tree-sitter-typescript>=0.23,<0.24", "tree-sitter-go>=0.25,<0.26", "tree-sitter-rust>=0.24,<0.25", "tree-sitter-java>=0.23,<0.24", "tree-sitter-c-sharp>=0.23,<0.24"]
 description = "ACCO — AI Coding Context Optimizer: local context, retrieval, output, memory, routing, and MCP optimization for AI coding agents."
 keywords = ["token-optimization", "context-optimization", "ai-coding-agent", "mcp", "llm", "claude-code", "codex", "cursor", "opencode", "copilot", "developer-tools"]
