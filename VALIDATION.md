@@ -1,4 +1,53 @@
-# Validation for 1.21.0
+# Validation for 1.22.0
+
+## 1.22 workspace federation and whole-context orchestration
+
+Version 1.22 adds two orchestration layers above ACCO's existing repository and
+provider boundaries while retaining repository-local source authority and
+fail-closed host integration.
+
+Mechanical validation covers:
+
+- a single host transport registry that distinguishes automatic foreground
+  interception, automatic durable attachment, environment-only persistence,
+  manual-setting persistence, and unsupported provider routing without
+  rewriting undocumented host state;
+- durable Claude/Codex provider mapping derived from that registry plus
+  machine-readable `acco transport-status` reporting;
+- workspace manifests with explicit repository identities, duplicate/path
+  guards, bounded direct-child discovery, lifecycle operations that never
+  mutate repository contents, and package dependency edges from
+  package.json, pyproject.toml, Cargo.toml, and go.mod;
+- federated workspace retrieval that calls each repository's existing
+  `RepositoryContextService`, ranks/selects repositories, reserves at most a
+  bounded dependency slot, divides one hard global token budget, and retains
+  per-repository selected-file/scanned-file provenance;
+- deterministic whole-context allocation across source, history, memory,
+  historical tool results, tool schemas, and reserve with exact integer token
+  conservation, task/complexity/risk policy, and observed-demand caps;
+- opt-in runtime configuration so existing projects keep historical behavior
+  unless `[context_budget]`, `acco pack --context-budget`, or provider-proxy
+  budget configuration is explicitly enabled;
+- source-pack enforcement of only the allocated source slice while preserving
+  the caller's explicit source cap;
+- provider-side enforcement limited to schema and historical tool-result slices
+  that ACCO can already compress recoverably; history and durable-memory slices
+  remain explicit orchestration guidance rather than hidden mutation;
+- Python SDK, loopback SDK bridge, and TypeScript-client parity for
+  `/v1/context-budget`.
+
+The combined post-rebase feature state passed the complete 19-job CI matrix on
+the final PR head before merge, including Python 3.10/3.12/3.13, native Windows
+full-suite/retrieval/product-UX gates, TypeScript SDK, Rust/HNSW parity, frozen
+retrieval holdout, ranking regression, real CLI-output corpora, and standalone
+Linux/macOS/Windows x86_64 and ARM64 smoke tests.
+
+These checks establish deterministic allocation, hard-budget behavior,
+cross-repository provenance, host-capability honesty, and cross-platform
+mechanics. They do **not** establish that the new allocator has learned an
+optimal allocation policy or that the full ACCO stack improves production cost
+per successful task. Quality-gated allocation calibration and fresh paired
+whole-system evaluation remain separate evidence requirements.
 
 ## 1.21 persistent provider runtime and optional domain middleware
 

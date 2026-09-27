@@ -1,5 +1,33 @@
 # Unreleased
 
+# 1.22.0 - 2026-09-27
+
+- **Added an explicit host transport capability registry.** `acco transport-status`
+  now reports whether provider interception is automatic, environment-only,
+  manual-setting, or unsupported for each host. Persistent Claude/Codex routing
+  derives from this single fail-closed registry instead of duplicating host
+  policy across proxy code.
+- **Added federated multi-repository workspace intelligence.** `acco workspace
+  init|add|remove|status|pack` keeps each repository's existing ACCO index and
+  ranking pipeline authoritative, scores repositories for the task, incorporates
+  bounded package-dependency hints from package.json/pyproject.toml/Cargo.toml/go.mod,
+  allocates one hard global token budget, and preserves repository provenance in
+  the combined context.
+- **Added adaptive whole-context budgeting.** `acco context-budget` allocates a
+  caller-owned context envelope across exact source, prior history, durable
+  memory, historical tool results, tool schemas, and reserve. Repository packing
+  consumes only the source slice; provider interception can use observed schema
+  and historical tool-result demand to decide when existing recoverable
+  compression should activate.
+- **Exposed whole-context planning to custom agents.** Python SDK,
+  `POST /v1/context-budget`, and the typed TypeScript client now share the same
+  deterministic planner. The TypeScript SDK source package advances to 0.3.0.
+- **Preserved conservative evidence boundaries.** The new workspace and budget
+  layers are release-gated mechanically, but ACCO does not claim that these
+  additions alone establish a universal reduction in API cost or cost per
+  successful coding task. That still requires fresh paired full-stack evidence.
+
+
 # 1.21.0 - 2026-09-27
 
 - **Broadened zero-config provider wrapping without replacing ACCO's
