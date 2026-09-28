@@ -403,13 +403,48 @@ ACCO template. A user-edited skill is preserved.
 
 ### Cursor
 
-Setup manages only:
+Setup manages:
 
 ```text
-.cursor/mcp.json → mcpServers.acco
+.cursor/mcp.json   → mcpServers.acco
+.cursor/hooks.json → only commands prefixed with "acco hook --host cursor --event "
 ```
 
-Other MCP servers remain untouched.
+Other MCP servers and user hook entries remain untouched.
+
+### Gemini CLI
+
+Setup merges only ACCO command hooks into:
+
+```text
+.gemini/settings.json → hooks.*
+```
+
+Unrelated Gemini settings and hooks are preserved.
+
+### Qwen Code
+
+Setup merges only ACCO command hooks into:
+
+```text
+.qwen/settings.json → hooks.*
+```
+
+Unrelated Qwen settings and hooks are preserved.
+
+### GitHub Copilot CLI
+
+When the Copilot CLI surface is detected, setup creates the dedicated repository
+hook file:
+
+```text
+.github/hooks/acco.json
+```
+
+ACCO owns that whole file and refuses to overwrite it if the path already
+contains a non-ACCO hook document. Existing Copilot MCP setup remains managed
+through the host's native MCP registry; the VS Code workspace MCP surface remains
+`.vscode/mcp.json`.
 
 ### Codex
 
