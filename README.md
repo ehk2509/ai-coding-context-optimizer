@@ -1,8 +1,37 @@
-# ACCO — AI Coding Context Optimizer 1.22.1
+# ACCO — AI Coding Context Optimizer 1.23.0
 
 **ACCO (AI Coding Context Optimizer)** is a local context-optimization layer for AI coding agents. It reduces unnecessary source, tool-output, and always-on context while preserving exact code where the model needs it.
 
 The project is deliberately conservative: **smaller context is useful only when the task still succeeds**. ACCO does not claim a universal percentage reduction in task cost. It measures input size, preserves diagnostics, and keeps omitted command output recoverable.
+
+## What's new in 1.23.0
+
+ACCO 1.23 closes two major context-efficiency gaps while keeping its
+retrieval-first design:
+
+- **Out-of-context programmable execution.** Agents can run bounded local
+  analysis over explicit repository text files and return only a small JSON
+  result instead of loading large logs, JSON, reports, or fixtures into model
+  context. The same implementation is available through MCP, Python, the
+  loopback SDK bridge, TypeScript, and standalone binaries. Oversized computed
+  results remain exactly recoverable through `tsr_...` handles.
+- **Native coding-host interception.** The shared `HookRuntime` now powers
+  native project hooks for Codex, Cursor, Gemini CLI, Qwen Code, and Copilot
+  CLI in addition to Claude Code. ACCO advertises only what each host can
+  actually enforce; Codex interception remains conditional on the host's
+  project-hook trust boundary.
+- **Stronger completion discipline.** A prompt-derived task checklist protects
+  focused verification from stopping after only the first API/path named in a
+  multi-path issue.
+- **Broader end-to-end evidence.** A 144-run paired SWE-bench development study
+  measured fewer model calls/tokens and lower equivalent cost per solved task,
+  but ACCO withholds a general savings claim because the suite was adapted
+  rather than frozen and ACCO solved 55/72 runs versus 56/72 for plain Claude
+  Code.
+
+The release still makes no universal token, API-cost, or cost-per-success claim;
+see [Validation evidence](VALIDATION.md) and
+[Benchmarking methodology](BENCHMARKING.md).
 
 ## Install
 
