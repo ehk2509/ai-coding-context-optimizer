@@ -215,8 +215,10 @@ def test_codex_hook_install_is_idempotent_and_preserves_user_groups(tmp_path):
     )
 
     install_codex_hooks(tmp_path)
+    first = path.read_bytes()
     install_codex_hooks(tmp_path)
 
+    assert path.read_bytes() == first
     payload = json.loads(path.read_text(encoding="utf-8"))
     serialized = json.dumps(payload)
     assert payload["description"] == "user hooks"
