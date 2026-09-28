@@ -8,6 +8,7 @@ Claude, environment variables, persistence, and repository implementations.
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -183,9 +184,25 @@ def run(payload: dict) -> tuple[int, dict | None]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Run the Claude hook JSON stdin/stdout adapter."""
+    """Run the selected coding-host hook JSON stdin/stdout adapter."""
 
-    del argv
+    parser = argparse.ArgumentParser(prog="acco hook")
+    parser.add_argument(
+        "--host",
+        choices=["claude", "cursor", "gemini", "qwen", "copilot"],
+        default="claude",
+    )
+    parser.add_argument("--event")
+    args = parser.parse_args(argv)
+    if args.host != "claude":
+        if not args.event:
+            parser.error("--event is required when --host is not claude")
+        from .native_hooks import main as native_main
+
+        return native_main(args.host, args.event)
+
+    if args.event:
+        parser.error("--event is only used with non-Claude hosts")
     try:
         payload = json.loads(sys.stdin.read() or "{}")
     except ValueError:
