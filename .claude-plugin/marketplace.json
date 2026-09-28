@@ -11,7 +11,7 @@
       "description": "Local context, output, session, retrieval, and safe prompt-ingress optimization.",
       "source": {
         "source": "command",
-        "command": "python -m pip install --user --quiet \"acco>=1.22.1\" || python -m pip install --user --quiet git+https://github.com/ehk2509/ai-coding-context-optimizer.git && python -c \"from acco.claude_plugin import render_plugin; print(render_plugin())\"",
+        "command": "python -m pip install --user --quiet \"acco>=1.23.0\" || python -m pip install --user --quiet git+https://github.com/ehk2509/ai-coding-context-optimizer.git && python -c \"from acco.claude_plugin import render_plugin; print(render_plugin())\"",
         "timeout": 300
       },
       "homepage": "https://github.com/ehk2509/ai-coding-context-optimizer",
