@@ -760,7 +760,8 @@ def uninstall_integrations(
         _validate_json_object(claude_settings_path(root))
         _validate_json_object(claude_mcp_path(root))
     if "cursor" in requested:
-        _validate_json_object(cursor_mcp_path(root))\n        _validate_json_object(cursor_hooks_path(root))
+        _validate_json_object(cursor_mcp_path(root))
+        _validate_json_object(cursor_hooks_path(root))
     if "opencode" in requested:
         _validate_json_object(opencode_mcp_path(root))
     if "copilot" in requested:
