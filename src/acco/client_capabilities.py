@@ -82,16 +82,20 @@ CLIENT_CAPABILITIES = {
     ),
     "cursor": _caps(
         "cursor",
-        "MCP is the stable integration surface; editor-specific interception is not assumed.",
-        pre_tool_intercept="unknown",
-        post_tool_replace="unknown",
-        prompt_ingress="no",
-        session_hooks="unknown",
+        (
+            "ACCO manages Cursor project hooks for pre-tool read/shell guards, "
+            "prompt ingress, lifecycle continuity, and compaction checkpoints. "
+            "Cursor does not expose general built-in post-tool result replacement."
+        ),
+        pre_tool_intercept="yes",
+        post_tool_replace="conditional",
+        prompt_ingress="yes",
+        session_hooks="yes",
         mcp="yes",
         dynamic_mcp_refresh="conditional",
         provider_base_url="conditional",
         model_route_execution="advisory",
-        usage_observation="unknown",
+        usage_observation="conditional",
     ),
     "opencode": _caps(
         "opencode",
@@ -134,16 +138,20 @@ CLIENT_CAPABILITIES = {
     ),
     "copilot": _caps(
         "copilot",
-        "GitHub Copilot CLI and VS Code both expose MCP surfaces; proprietary lifecycle interception is not assumed.",
-        pre_tool_intercept="unknown",
-        post_tool_replace="unknown",
+        (
+            "Copilot CLI repository hooks provide pre-tool control and exact "
+            "post-tool result replacement. Command user-prompt hooks cannot "
+            "rewrite or inject prompt content, so ingress remains unavailable."
+        ),
+        pre_tool_intercept="yes",
+        post_tool_replace="yes",
         prompt_ingress="no",
-        session_hooks="unknown",
+        session_hooks="yes",
         mcp="yes",
         dynamic_mcp_refresh="conditional",
         provider_base_url="unknown",
         model_route_execution="advisory",
-        usage_observation="unknown",
+        usage_observation="conditional",
     ),
     "antigravity": _caps(
         "antigravity",
@@ -160,16 +168,37 @@ CLIENT_CAPABILITIES = {
     ),
     "gemini-cli": _caps(
         "gemini-cli",
-        "ACCO exposes reusable MCP/provider surfaces but does not assume vendor hook parity.",
-        pre_tool_intercept="unknown",
-        post_tool_replace="unknown",
-        prompt_ingress="unknown",
-        session_hooks="unknown",
+        (
+            "ACCO manages Gemini project hooks. BeforeTool gates large reads/shell "
+            "dumps and AfterTool can hide the original shell result while returning "
+            "ACCO's recoverable compact replacement."
+        ),
+        pre_tool_intercept="yes",
+        post_tool_replace="yes",
+        prompt_ingress="yes",
+        session_hooks="yes",
         mcp="conditional",
         dynamic_mcp_refresh="conditional",
         provider_base_url="conditional",
         model_route_execution="advisory",
-        usage_observation="unknown",
+        usage_observation="conditional",
+    ),
+    "qwen-code": _caps(
+        "qwen-code",
+        (
+            "ACCO manages Qwen project hooks for pre-tool guards, prompt ingress, "
+            "session continuity, and compaction checkpoints. Qwen PostToolUse "
+            "does not expose a documented general successful-result replacement."
+        ),
+        pre_tool_intercept="yes",
+        post_tool_replace="conditional",
+        prompt_ingress="yes",
+        session_hooks="yes",
+        mcp="conditional",
+        dynamic_mcp_refresh="conditional",
+        provider_base_url="conditional",
+        model_route_execution="advisory",
+        usage_observation="conditional",
     ),
     "generic-mcp": _caps(
         "generic-mcp",
@@ -206,6 +235,8 @@ def normalize_client_name(value: str) -> str:
         "copilot-chat": "copilot",
         "google-antigravity": "antigravity",
         "gemini": "gemini-cli",
+        "qwen": "qwen-code",
+        "qwen-code-cli": "qwen-code",
         "mcp": "generic-mcp",
         "generic": "generic-mcp",
     }
