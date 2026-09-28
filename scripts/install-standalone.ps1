@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-$repo = "elyeshkiri/ai-coding-context-optimizer"
+$repo = "ehk2509/ai-coding-context-optimizer"
 $version = if ($env:ACCO_VERSION) { $env:ACCO_VERSION } else { "latest" }
 $installDir = if ($env:ACCO_INSTALL_DIR) {
     $env:ACCO_INSTALL_DIR
