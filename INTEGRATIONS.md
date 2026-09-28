@@ -20,7 +20,7 @@ Claude-only users on Claude Code **2.1.229+** can install through the repository
 marketplace without first placing the `acco` console script on `PATH`:
 
 ```text
-/plugin marketplace add elyeshkiri/ai-coding-context-optimizer
+/plugin marketplace add ehk2509/ai-coding-context-optimizer
 /plugin install acco@acco-tools
 ```
 
