@@ -637,9 +637,31 @@ def main(argv: list[str] | None = None) -> int:
 
     h = sub.add_parser(
         "hook",
-        help="Claude Code hook: guard large Reads + filter noisy tool output",
+        help="coding-agent hook adapter: guard large Reads + filter noisy tool output",
     )
-    h.set_defaults(func=lambda _args: hook_main())
+    h.add_argument(
+        "--host",
+        choices=["claude", "cursor", "gemini", "qwen", "copilot"],
+        default="claude",
+        help="hook protocol to serve (default: claude)",
+    )
+    h.add_argument(
+        "--event",
+        help="native host event name; required for non-Claude adapters",
+    )
+    h.set_defaults(
+        func=lambda args: hook_main(
+            [
+                "--host",
+                args.host,
+                *(
+                    ["--event", args.event]
+                    if args.event is not None
+                    else []
+                ),
+            ]
+        )
+    )
 
     ins = sub.add_parser(
         "install",
