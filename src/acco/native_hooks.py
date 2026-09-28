@@ -460,11 +460,11 @@ def adapt_response(host: str, event: str, response: dict | None) -> dict:
 
 def run_native_hook(host: str, event: str, payload: dict) -> dict:
     """Run one native host event through ACCO's existing policy runtime."""
-    from .hook import _runtime
+    from .hook import build_hook_runtime
     from .hook_runtime import HookRuntime
 
     normalized = normalize_payload(host, event, payload)
-    runtime = _runtime(Path(normalized["cwd"]))
+    runtime = build_hook_runtime(Path(normalized["cwd"]))
 
     if normalized["hook_event_name"] == "PostToolUse" and host in {
         "gemini",
