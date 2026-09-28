@@ -714,6 +714,44 @@ tool-cascade detection requires a configured number of tool calls without an
 edit. The operational event ledger can inform later evaluation, but it never
 changes the frozen retrieval/effectiveness publication gates.
 
+## Native host-hook adapter boundary
+
+Native coding-agent hooks are transport adapters over the existing
+`HookRuntime`; they are not independent policy engines.
+
+```text
+Cursor / Gemini / Qwen / Copilot native event
+        ↓
+native_hooks.normalize_payload
+        ↓
+HookRuntime + existing services
+        ↓
+native_hooks.adapt_response
+        ↓
+host-native decision / replacement JSON
+```
+
+`native_hooks.py` owns event names, tool-id normalization, model-visible result
+extraction, and documented response-schema translation. Read guarding, command
+output processing, exact recovery, prompt ingress, generation policy, continuity,
+routing advice, and efficiency telemetry stay in the same application services
+used by Claude Code.
+
+Host capability differences are explicit. Gemini and Copilot provide documented
+successful-result replacement semantics, so their post-tool adapters can run
+large Bash/Grep/WebFetch/WebSearch/MCP-style textual output through the ordinary
+output pipeline before it reaches the model. Cursor and Qwen do not expose a
+documented general successful-result replacement in their command-hook surfaces,
+so ACCO does not manufacture one: those hosts use pre-tool guards and supported
+prompt/session/compaction lifecycle hooks only.
+
+`native_hook_configs.py` owns project configuration. Shared Cursor, Gemini, and
+Qwen JSON files are merged by removing/replacing only commands with ACCO's stable
+native-hook prefix. Copilot uses a dedicated `.github/hooks/acco.json`; an
+unmanaged file at that exact path is a hard preflight conflict. Setup preflights
+all selected surfaces before mutation, and uninstall removes only ACCO-owned
+entries.
+
 ## Hook boundary
 
 `acco.hook` is now the Claude-specific composition root only. It parses
@@ -843,6 +881,11 @@ behavior or duplicating repository logic.
     are admitted, and oversized results require exact recovery before a lossy
     preview may cross the model boundary. Execution is not represented as a
     hardened hostile-code sandbox.
+
+21. **Native hooks translate, never fork policy:** non-Claude host adapters
+    normalize input and translate output only. A host without documented
+    successful-result replacement must not be represented as if ACCO can rewrite
+    that result, and shared host configuration may remove only ACCO-owned entries.
 
 
 `tests/test_architecture_boundaries.py`, `tests/test_hook_runtime.py`,
