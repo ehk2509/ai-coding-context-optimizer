@@ -641,6 +641,7 @@ def setup_integrations(
         _validate_json_object(claude_mcp_path(root))
     if "cursor" in requested:
         _validate_json_object(cursor_mcp_path(root))
+        _validate_json_object(cursor_hooks_path(root))
     if "codex" in requested:
         _validate_codex_manageable(codex_config_path(home))
     if "opencode" in requested:
@@ -659,10 +660,15 @@ def setup_integrations(
             )
         if copilot_cli_surface:
             validate_copilot_cli_manageable(home)
+            validate_copilot_hooks_manageable(root)
         if copilot_vscode_surface:
             _validate_json_object(copilot_mcp_path(root))
     if "antigravity" in requested:
         _validate_json_object(antigravity_mcp_path(root))
+    if "gemini" in requested:
+        _validate_json_object(gemini_settings_path(root))
+    if "qwen" in requested:
+        _validate_json_object(qwen_settings_path(root))
     if "hermes" in requested:
         validate_hermes_manageable(hermes_config_path(home))
     if "openclaw" in requested and not which(HOST_EXECUTABLES["openclaw"]):
@@ -682,6 +688,7 @@ def setup_integrations(
         changed.append("claude")
     if "cursor" in requested:
         update_json(cursor_mcp_path(root), _merge_mcp(root))
+        install_cursor_hooks(root)
         changed.append("cursor")
     if "codex" in requested:
         _install_codex(codex_config_path(home))
@@ -704,12 +711,20 @@ def setup_integrations(
         )
         if cli_executable:
             install_copilot_cli(home=home, runner=runner)
+        if copilot_cli_surface:
+            install_copilot_hooks(root)
         if copilot_vscode_surface:
             install_copilot_vscode(root)
         changed.append("copilot")
     if "antigravity" in requested:
         install_antigravity(root)
         changed.append("antigravity")
+    if "gemini" in requested:
+        install_gemini_hooks(root)
+        changed.append("gemini")
+    if "qwen" in requested:
+        install_qwen_hooks(root)
+        changed.append("qwen")
 
     return {
         "root": str(root),
