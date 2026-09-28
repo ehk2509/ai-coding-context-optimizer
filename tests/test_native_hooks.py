@@ -153,6 +153,35 @@ def test_qwen_normalization_maps_runtime_tool_ids_to_acco_tools(tmp_path):
     assert payload["tool_input"]["command"] == "pytest -q"
 
 
+def test_qwen_ignores_non_user_prompt_continuations(tmp_path):
+    """Qwen tool-result continuations must not masquerade as new user prompts."""
+    payload = normalize_payload(
+        "qwen",
+        "UserPromptSubmit",
+        {
+            "cwd": str(tmp_path),
+            "prompt": "tool continuation text",
+        },
+    )
+
+    assert payload["prompt"] == ""
+
+
+def test_qwen_keeps_explicit_submitted_prompt(tmp_path):
+    """Qwen explicit submitted_prompt remains eligible for ingress/policy hooks."""
+    payload = normalize_payload(
+        "qwen",
+        "UserPromptSubmit",
+        {
+            "cwd": str(tmp_path),
+            "prompt": "expanded runtime prompt",
+            "submitted_prompt": "fix the parser",
+        },
+    )
+
+    assert payload["prompt"] == "fix the parser"
+
+
 def test_copilot_normalizes_pascalcase_posttool_payload(tmp_path):
     """Copilot's VS Code-compatible shape should become one canonical result."""
     payload = normalize_payload(
