@@ -378,3 +378,41 @@ def test_codex_session_start_maps_continuity_to_developer_context():
             "additionalContext": "continue from tests/test_parser.py",
         }
     }
+
+
+def test_codex_mcp_result_uses_generic_recoverable_output_pipeline(
+    tmp_path, monkeypatch
+):
+    """Codex MCP tool output should be compressible without a host-specific processor."""
+    monkeypatch.setenv("ACCO_STATE_DIR", str(tmp_path / "state"))
+    original = _large_output()
+
+    normalized = normalize_payload(
+        "codex",
+        "PostToolUse",
+        {
+            "cwd": str(tmp_path),
+            "session_id": "thr_mcp",
+            "tool_name": "mcp__github__search",
+            "tool_input": {"query": "open issues"},
+            "tool_response": {"content": original},
+        },
+    )
+    assert normalized["tool_name"] == "GenericOutput"
+
+    result = run_native_hook(
+        "codex",
+        "PostToolUse",
+        {
+            "cwd": str(tmp_path),
+            "session_id": "thr_mcp",
+            "tool_name": "mcp__github__search",
+            "tool_input": {"query": "open issues"},
+            "tool_response": {"content": original},
+        },
+    )
+
+    assert result["continue"] is False
+    compact = result["hookSpecificOutput"]["additionalContext"]
+    assert len(compact) < len(original)
+    assert "acco recovery:" in compact
