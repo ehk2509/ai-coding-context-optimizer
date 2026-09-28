@@ -19,7 +19,7 @@ from pathlib import Path
 import sys
 from typing import Any
 
-SUPPORTED_NATIVE_HOOK_HOSTS = ("cursor", "gemini", "qwen", "copilot")
+SUPPORTED_NATIVE_HOOK_HOSTS = ("cursor", "gemini", "qwen", "copilot", "codex")
 
 _EVENT_MAP = {
     "cursor": {
@@ -52,6 +52,14 @@ _EVENT_MAP = {
         "PreCompact": "PreCompact",
         "Stop": "Stop",
     },
+    "codex": {
+        "PreToolUse": "PreToolUse",
+        "PostToolUse": "PostToolUse",
+        "UserPromptSubmit": "UserPromptSubmit",
+        "SessionStart": "SessionStart",
+        "PreCompact": "PreCompact",
+        "Stop": "Stop",
+    },
 }
 
 _TOOL_MAP = {
@@ -76,6 +84,12 @@ _TOOL_MAP = {
     # ACCO configures Copilot with PascalCase event names. Copilot then emits
     # VS Code-compatible snake_case payloads and Claude-compatible tool names.
     "copilot": {},
+    "codex": {
+        "read_file": "Read",
+        "Read": "Read",
+        "grep": "Grep",
+        "Grep": "Grep",
+    },
 }
 
 
@@ -152,6 +166,85 @@ def _text(value: object) -> str:
 
 def _canonical_tool_response(host: str, payload: dict) -> dict:
     """Translate one supported successful tool response to HookRuntime shape."""
+    if host == "codex":
+        if event == "PreToolUse":
+            specific = _specific(response)
+            if not specific:
+                return {}
+            allowed = {
+                key: value
+                for key, value in specific.items()
+                if key in {
+                    "permissionDecision",
+                    "permissionDecisionReason",
+                    "additionalContext",
+                    "updatedInput",
+                }
+            }
+            if not allowed:
+                return {}
+            allowed["hookEventName"] = "PreToolUse"
+            return {"hookSpecificOutput": allowed}
+        if event == "PostToolUse":
+            result: dict[str, Any] = {}
+            stdout = _updated_stdout(response)
+            context = _additional_context(response)
+            if stdout is not None:
+                # Codex documents continue:false as the non-rejecting way to
+                # suppress normal processing of the original tool result. The
+                # compact replacement is delivered as hook additional context.
+                result["continue"] = False
+                result["stopReason"] = (
+                    "ACCO replaced the original tool result with compact "
+                    "recoverable context."
+                )
+                result["hookSpecificOutput"] = {
+                    "hookEventName": "PostToolUse",
+                    "additionalContext": stdout,
+                }
+            elif context:
+                result["hookSpecificOutput"] = {
+                    "hookEventName": "PostToolUse",
+                    "additionalContext": context,
+                }
+            return result
+        if event == "UserPromptSubmit":
+            reason = _blocked_prompt_reason(response)
+            if reason:
+                return {"decision": "block", "reason": reason}
+            result = {}
+            context = _additional_context(response)
+            if context:
+                result["hookSpecificOutput"] = {
+                    "hookEventName": "UserPromptSubmit",
+                    "additionalContext": context,
+                }
+            system = response.get("systemMessage") if isinstance(response, dict) else None
+            if isinstance(system, str) and system:
+                result["systemMessage"] = system
+            return result
+        if event == "SessionStart":
+            context = _additional_context(response)
+            result = {}
+            if context:
+                result["hookSpecificOutput"] = {
+                    "hookEventName": "SessionStart",
+                    "additionalContext": context,
+                }
+            system = response.get("systemMessage") if isinstance(response, dict) else None
+            if isinstance(system, str) and system:
+                result["systemMessage"] = system
+            return result
+        if event in {"PreCompact", "Stop"}:
+            if not isinstance(response, dict):
+                return {}
+            return {
+                key: response[key]
+                for key in ("continue", "stopReason", "systemMessage")
+                if key in response
+            }
+        return {}
+
     if host == "copilot":
         raw = payload.get("tool_result") or payload.get("toolResult") or {}
         stdout = _text(raw)
@@ -162,6 +255,20 @@ def _canonical_tool_response(host: str, payload: dict) -> dict:
             "interrupted": False,
             "isImage": False,
             "exit_code": 0 if result.get("result_type", result.get("resultType")) == "success" else None,
+        }
+    if host == "codex":
+        raw = payload.get("tool_response")
+        result = raw if isinstance(raw, dict) else {}
+        error = result.get("error")
+        exit_code = result.get("exit_code", result.get("exitCode"))
+        if not isinstance(exit_code, int) or isinstance(exit_code, bool):
+            exit_code = 1 if error else 0
+        return {
+            "stdout": _text(raw),
+            "stderr": _text(error) if error else "",
+            "interrupted": bool(result.get("interrupted", False)),
+            "isImage": bool(result.get("isImage", False)),
+            "exit_code": exit_code,
         }
     if host == "cursor":
         raw = _parse_mapping(payload.get("tool_output"))
@@ -211,7 +318,7 @@ def normalize_payload(host: str, event: str, payload: dict) -> dict:
         canonical_tool = _TOOL_MAP[host].get(raw_tool, raw_tool)
         if (
             canonical_event == "PostToolUse"
-            and host in {"gemini", "copilot"}
+            and host in {"gemini", "copilot", "codex"}
             and canonical_tool
             not in {"Bash", "Grep", "WebFetch", "WebSearch", "Read", "Write", "Edit"}
         ):
@@ -473,6 +580,7 @@ def run_native_hook(host: str, event: str, payload: dict) -> dict:
     if normalized["hook_event_name"] == "PostToolUse" and host in {
         "gemini",
         "copilot",
+        "codex",
     }:
         runtime = HookRuntime(
             runtime.services,
