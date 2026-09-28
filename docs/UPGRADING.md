@@ -8,7 +8,7 @@ distributions:
 - `uv`, `pipx`, and pip installations keep using their Python package manager;
 - Homebrew-managed frozen binaries delegate to `brew upgrade acco`;
 - WinGet-managed frozen binaries delegate to
-  `winget upgrade --id ElyesHkiri.ACCO --exact`;
+  `winget upgrade --id ehk2509.ACCO --exact`;
 - raw Linux/macOS/Windows standalone binaries detect x86_64 versus ARM64,
   download the matching release asset and checksum, smoke-test it, and replace
   safely.
@@ -43,7 +43,7 @@ ACCO prefers `uv tool upgrade acco`, then `pipx upgrade acco`, and falls
 back to `python -m pip install --upgrade acco`. No mutation happens unless
 `--apply` is explicit.
 
-The GitHub repository remains `elyeshkiri/ai-coding-context-optimizer`.
+The GitHub repository remains `ehk2509/ai-coding-context-optimizer`.
 Checked-in benchmark identifiers use the canonical ACCO namespace.
 
 ## 1.14 expanded coding-agent integration matrix
