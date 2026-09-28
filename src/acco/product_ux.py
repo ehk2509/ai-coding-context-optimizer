@@ -544,7 +544,7 @@ def demo_main(argv: list[str]) -> int:
 
 
 STANDALONE_RELEASE_BASE = (
-    "https://github.com/elyeshkiri/ai-coding-context-optimizer/"
+    "https://github.com/ehk2509/ai-coding-context-optimizer/"
     "releases/latest/download"
 )
 
@@ -613,7 +613,7 @@ def _upgrade_command() -> tuple[str, list[str]]:
                 "winget",
                 "upgrade",
                 "--id",
-                "ElyesHkiri.ACCO",
+                "ehk2509.ACCO",
                 "--exact",
                 "--accept-source-agreements",
                 "--accept-package-agreements",

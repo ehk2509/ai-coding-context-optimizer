@@ -7,7 +7,7 @@ retrieval recall are regressions.
 ## Development setup
 
 ```bash
-git clone https://github.com/elyeshkiri/ai-coding-context-optimizer.git
+git clone https://github.com/ehk2509/ai-coding-context-optimizer.git
 cd acco
 python -m venv .venv
 . .venv/bin/activate

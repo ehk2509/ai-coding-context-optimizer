@@ -21,7 +21,7 @@ ACCO preserves the installation owner:
   `pip install --upgrade acco`;
 - Homebrew-managed frozen binaries use `brew upgrade acco`;
 - WinGet-managed frozen binaries use
-  `winget upgrade --id ElyesHkiri.ACCO --exact`;
+  `winget upgrade --id ehk2509.ACCO --exact`;
 - raw standalone Linux/macOS/Windows binaries use ACCO's checksum-verified
   native updater for the current OS and architecture.
 

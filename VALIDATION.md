@@ -1001,7 +1001,7 @@ critical-line survival predicate:
 
 | Engine | weighted estimated token reduction | critical-line survival | changed cases |
 | --- | ---: | ---: | ---: |
-| elyeshkiri/ai-coding-context-optimizer | **23.72%** | **100.00%** | 8/30 |
+| ehk2509/ai-coding-context-optimizer | **23.72%** | **100.00%** | 8/30 |
 | ppgranger/token-saver @ 19d47b2c | **23.95%** | **81.25%** | 21/30 |
 
 The reduction difference is **6 estimated output tokens across the full
@@ -1046,7 +1046,7 @@ On this untouched v2 proof set:
 
 | Engine | weighted estimated token reduction | critical-line survival | estimated output tokens |
 | --- | ---: | ---: | ---: |
-| elyeshkiri/ai-coding-context-optimizer | **30.80%** | **100.00%** | **1,777** |
+| ehk2509/ai-coding-context-optimizer | **30.80%** | **100.00%** | **1,777** |
 | ppgranger/token-saver @ 19d47b2c | **28.23%** | **76.92%** | 1,843 |
 
 That is a **2.57 percentage-point overall reduction advantage** and 66 fewer
@@ -1056,7 +1056,7 @@ mechanically detected critical lines survive.
 The tuned subfamilies are not uniformly ahead, so the result is reported
 without hiding the remaining gap:
 
-| Fresh v2 subset | elyeshkiri reduction | ppgranger reduction | elyeshkiri critical survival | ppgranger critical survival |
+| Fresh v2 subset | ehk2509 reduction | ppgranger reduction | ehk2509 critical survival | ppgranger critical survival |
 | --- | ---: | ---: | ---: | ---: |
 | Git diff | **31.84%** | 28.86% | 100% | 100% |
 | Go build/test | **36.67%** | 24.29% | **100%** | 75% |
@@ -1097,7 +1097,7 @@ On this untouched v3 proof set:
 
 | Engine | weighted estimated token reduction | critical-line survival |
 | --- | ---: | ---: |
-| elyeshkiri/ai-coding-context-optimizer | 50.50% | **100.00%** |
+| ehk2509/ai-coding-context-optimizer | 50.50% | **100.00%** |
 | ppgranger/token-saver @ 19d47b2c | **51.25%** | 80.00% |
 
 The overall compression difference is only **0.75 percentage points** on the
@@ -1106,7 +1106,7 @@ critical line.
 
 The target families show that the original gap is now close to parity:
 
-| Fresh v3 subset | elyeshkiri reduction | ppgranger reduction |
+| Fresh v3 subset | ehk2509 reduction | ppgranger reduction |
 | --- | ---: | ---: |
 | Git status (4 cases) | **62.90%** | 61.75% |
 | Git log (6 cases) | 78.21% | **79.63%** |

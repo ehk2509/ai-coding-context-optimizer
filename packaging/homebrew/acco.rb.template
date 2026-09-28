@@ -1,24 +1,24 @@
 class Acco < Formula
   desc "AI Coding Context Optimizer"
-  homepage "https://github.com/elyeshkiri/ai-coding-context-optimizer"
+  homepage "https://github.com/ehk2509/ai-coding-context-optimizer"
   version "__VERSION__"
 
   on_macos do
     if Hardware::CPU.arm?
-      url "https://github.com/elyeshkiri/ai-coding-context-optimizer/releases/download/v__VERSION__/acco-macos-arm64"
+      url "https://github.com/ehk2509/ai-coding-context-optimizer/releases/download/v__VERSION__/acco-macos-arm64"
       sha256 "__MACOS_ARM64_SHA256__"
     else
-      url "https://github.com/elyeshkiri/ai-coding-context-optimizer/releases/download/v__VERSION__/acco-macos-x86_64"
+      url "https://github.com/ehk2509/ai-coding-context-optimizer/releases/download/v__VERSION__/acco-macos-x86_64"
       sha256 "__MACOS_X86_64_SHA256__"
     end
   end
 
   on_linux do
     if Hardware::CPU.arm?
-      url "https://github.com/elyeshkiri/ai-coding-context-optimizer/releases/download/v__VERSION__/acco-linux-arm64"
+      url "https://github.com/ehk2509/ai-coding-context-optimizer/releases/download/v__VERSION__/acco-linux-arm64"
       sha256 "__LINUX_ARM64_SHA256__"
     else
-      url "https://github.com/elyeshkiri/ai-coding-context-optimizer/releases/download/v__VERSION__/acco-linux-x86_64"
+      url "https://github.com/ehk2509/ai-coding-context-optimizer/releases/download/v__VERSION__/acco-linux-x86_64"
       sha256 "__LINUX_X86_64_SHA256__"
     end
   end

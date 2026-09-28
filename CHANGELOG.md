@@ -1,5 +1,13 @@
 # Unreleased
 
+- **Migrated project hosting identity to `ehk2509`.** Repository URLs, Claude
+  marketplace metadata, standalone installers, Homebrew publishing, and
+  documentation now target `ehk2509/ai-coding-context-optimizer`. Because
+  ACCO has no installed WinGet user base yet, the not-yet-adopted package
+  identifier and manifest layout also move from the old account-derived ID to
+  `ehk2509.ACCO` before public adoption.
+
+
 # 1.22.0 - 2026-09-27
 
 - **Added an explicit host transport capability registry.** `acco transport-status`
@@ -70,7 +78,7 @@
   process exit; Linux/macOS replace atomically in place.
 - **Preserved native package-manager ownership.** Frozen binaries installed by
   Homebrew or WinGet route `acco update` back through `brew upgrade acco` or
-  `winget upgrade --id ElyesHkiri.ACCO` instead of mutating package-managed
+  `winget upgrade --id ehk2509.ACCO` instead of mutating package-managed
   files directly.
 - **Expanded standalone releases to six native targets.** Release and PR smoke
   matrices now cover Linux x86_64/ARM64, macOS ARM64/Intel, and Windows
@@ -83,7 +91,7 @@
 - **Prepared package-manager-native distribution.** Releases now generate an
   architecture-complete Homebrew formula and WinGet 1.12 multi-file manifests
   from the actual release checksums. A secret-gated publisher workflow can
-  create/update `elyeshkiri/homebrew-acco` and submit WinGet manifests;
+  create/update `ehk2509/homebrew-acco` and submit WinGet manifests;
   absent publisher credentials, those external steps visibly no-op rather than
   claiming publication.
 

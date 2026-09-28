@@ -42,12 +42,12 @@ Authenticode/Apple signing and does not replace operating-system trust.
 
 The release always contains an architecture-complete `acco.rb`. The
 `Publish native packages` workflow can create/update
-`elyeshkiri/homebrew-acco` when the repository secret
+`ehk2509/homebrew-acco` when the repository secret
 `HOMEBREW_TAP_TOKEN` is configured with permission to create/push that
 repository. After first publication users can use:
 
 ```bash
-brew tap elyeshkiri/acco
+brew tap ehk2509/acco
 brew install acco
 ```
 
@@ -66,7 +66,7 @@ publisher no-ops when the token is absent. After Microsoft accepts the manifest,
 installation becomes:
 
 ```powershell
-winget install --id ElyesHkiri.ACCO
+winget install --id ehk2509.ACCO
 ```
 
 External package-manager acceptance is not represented as complete until those

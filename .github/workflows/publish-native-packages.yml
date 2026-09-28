@@ -60,11 +60,11 @@ jobs:
           GH_TOKEN="$RELEASE_TOKEN" gh release download "$TAG" --repo "${{ github.repository }}" --pattern "acco.rb" --dir package
 
           export GH_TOKEN="$TAP_TOKEN"
-          if ! gh repo view elyeshkiri/homebrew-acco >/dev/null 2>&1; then
-            gh repo create elyeshkiri/homebrew-acco --public --description "Homebrew tap for ACCO — AI Coding Context Optimizer"
+          if ! gh repo view ehk2509/homebrew-acco >/dev/null 2>&1; then
+            gh repo create ehk2509/homebrew-acco --public --description "Homebrew tap for ACCO — AI Coding Context Optimizer"
           fi
 
-          git clone "https://x-access-token:$TAP_TOKEN@github.com/elyeshkiri/homebrew-acco.git" tap
+          git clone "https://x-access-token:$TAP_TOKEN@github.com/ehk2509/homebrew-acco.git" tap
           git -C tap config user.name "acco-release-bot"
           git -C tap config user.email "actions@users.noreply.github.com"
           mkdir -p tap/Formula

@@ -1,14 +1,14 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.12.0.schema.json
-PackageIdentifier: ElyesHkiri.ACCO
+PackageIdentifier: ehk2509.ACCO
 PackageVersion: __VERSION__
 PackageLocale: en-US
 Publisher: Elyes Hkiri
-PublisherUrl: https://github.com/elyeshkiri
-PublisherSupportUrl: https://github.com/elyeshkiri/ai-coding-context-optimizer/issues
+PublisherUrl: https://github.com/ehk2509
+PublisherSupportUrl: https://github.com/ehk2509/ai-coding-context-optimizer/issues
 PackageName: ACCO
-PackageUrl: https://github.com/elyeshkiri/ai-coding-context-optimizer
+PackageUrl: https://github.com/ehk2509/ai-coding-context-optimizer
 License: MIT
-LicenseUrl: https://github.com/elyeshkiri/ai-coding-context-optimizer/blob/v__VERSION__/LICENSE
+LicenseUrl: https://github.com/ehk2509/ai-coding-context-optimizer/blob/v__VERSION__/LICENSE
 ShortDescription: AI Coding Context Optimizer for coding agents.
 Description: >-
   ACCO is a local context and agent-efficiency layer that retrieves relevant
