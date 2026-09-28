@@ -779,7 +779,6 @@ def uninstall_integrations(
     if "codex" in requested:
         _validate_codex_manageable(codex_config_path(home))
         _validate_json_object(codex_hooks_path(root))
-        validate_codex_hooks_manageable(root)
     if "opencode" in requested:
         _validate_json_object(opencode_mcp_path(root))
     if "copilot" in requested:
