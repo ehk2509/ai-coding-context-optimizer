@@ -144,6 +144,7 @@ def _remove_cursor_owned(payload: dict, host: str = "cursor") -> dict:
 def install_cursor_hooks(root: Path) -> None:
     """Merge ACCO native hooks into Cursor project configuration."""
     path = cursor_hooks_path(root)
+    path.parent.mkdir(parents=True, exist_ok=True)
 
     def mutate(current: dict) -> dict:
         updated = _remove_cursor_owned(current)
@@ -211,6 +212,7 @@ def _remove_nested_owned(payload: dict, host: str) -> dict:
 def _install_nested(root: Path, host: str, path: Path) -> None:
     """Install nested command hooks used by Gemini CLI or Qwen Code."""
     wanted = _nested_entries(host)
+    path.parent.mkdir(parents=True, exist_ok=True)
 
     def mutate(current: dict) -> dict:
         updated = _remove_nested_owned(current, host)
@@ -312,10 +314,7 @@ def install_copilot_hooks(root: Path) -> None:
     validate_copilot_hooks_manageable(root)
     path = copilot_hooks_path(root)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(_copilot_payload(), indent=2) + "\n",
-        encoding="utf-8",
-    )
+    update_json(path, lambda _current: _copilot_payload())
 
 
 def uninstall_copilot_hooks(root: Path) -> None:
