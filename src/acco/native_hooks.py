@@ -364,9 +364,12 @@ def adapt_response(host: str, event: str, response: dict | None) -> dict:
                     "ACCO replaced the original tool result with compact "
                     "recoverable context."
                 )
+                delivered = stdout
+                if context:
+                    delivered += "\n\n" + context
                 result["hookSpecificOutput"] = {
                     "hookEventName": "PostToolUse",
-                    "additionalContext": stdout,
+                    "additionalContext": delivered,
                 }
             elif context:
                 result["hookSpecificOutput"] = {
