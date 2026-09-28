@@ -27,7 +27,7 @@ acco setup [path] [--host HOST|all ...] [--no-index] [--no-lean]
 Human setup summary or JSON. Normal setup configures detected hosts, writes the
 safe local profile, installs Claude Lean when applicable without overwriting
 user-modified skill content, warms the structural index, and runs the same
-health checks as `doctor`. Cursor, Gemini CLI, Qwen Code, and Copilot CLI also receive native project hooks where their host contracts support them. A successful normal run ends with `READY` and suggests `acco start`.
+health checks as `doctor`. Codex, Cursor, Gemini CLI, Qwen Code, and Copilot CLI also receive native project hooks where their host contracts support them. Codex project hooks still require host trust review after first install or a definition change. A successful normal run ends with `READY` and suggests `acco start`.
 
 See [Machine-readable contracts](../JSON_OUTPUTS.md#setup-json).
 

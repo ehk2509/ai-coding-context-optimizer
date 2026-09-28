@@ -641,7 +641,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     h.add_argument(
         "--host",
-        choices=["claude", "cursor", "gemini", "qwen", "copilot"],
+        choices=["claude", "cursor", "gemini", "qwen", "copilot", "codex"],
         default="claude",
         help="hook protocol to serve (default: claude)",
     )

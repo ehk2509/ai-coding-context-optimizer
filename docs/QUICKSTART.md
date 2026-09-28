@@ -66,7 +66,7 @@ acco setup . --host all
 
 Setup is idempotent. `--host all` means all detected supported hosts, not every
 product ACCO knows about. Re-running setup after an upgrade is the
-supported repair/migration path. Native host hooks are installed for Cursor, Gemini CLI, Qwen Code, and Copilot CLI when those surfaces are selected or detected.
+supported repair/migration path. Native host hooks are installed for Codex, Cursor, Gemini CLI, Qwen Code, and Copilot CLI when those surfaces are selected or detected. Codex still requires its own project-hook trust review.
 
 ## 3. Start coding
 

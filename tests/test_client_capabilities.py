@@ -53,6 +53,10 @@ def test_extended_hosts_expose_mcp_without_inventing_hook_guarantees():
 
 def test_native_hook_hosts_report_only_documented_replacement_strength():
     """Native adapters should distinguish full result rewrite from partial hooks."""
+    assert capabilities_for("codex").level("pre_tool_intercept") == "conditional"
+    assert capabilities_for("codex").level("post_tool_replace") == "conditional"
+    assert capabilities_for("codex").level("prompt_ingress") == "conditional"
+    assert capabilities_for("codex").level("session_hooks") == "conditional"
     assert capabilities_for("cursor").guaranteed("pre_tool_intercept")
     assert capabilities_for("cursor").level("post_tool_replace") == "conditional"
     assert capabilities_for("copilot").guaranteed("post_tool_replace")

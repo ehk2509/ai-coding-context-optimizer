@@ -8,6 +8,7 @@ managed integrations use the same command with an explicit native host/event.
 ```bash
 acco hook
 acco hook --host cursor --event preToolUse
+acco hook --host codex --event PostToolUse
 acco hook --host gemini --event AfterTool
 acco hook --host qwen --event PreToolUse
 acco hook --host copilot --event PostToolUse
@@ -15,7 +16,7 @@ acco hook --host copilot --event PostToolUse
 
 ## Arguments and options
 
-- `--host {claude,cursor,gemini,qwen,copilot}` selects the hook protocol.
+- `--host {claude,cursor,codex,gemini,qwen,copilot}` selects the hook protocol.
   Default: `claude`.
 - `--event EVENT` supplies the native lifecycle event. It is required for
   non-Claude hosts and rejected for the default Claude adapter.
@@ -39,6 +40,10 @@ Argparse usage errors return the standard nonzero argparse exit code.
 
 - Claude: Claude Code hook JSON.
 - Cursor: native `permission` / `continue` / `additional_context` fields.
+- Codex: native lifecycle hook fields. Trusted PostToolUse hooks can stop normal
+  handling of a large local Bash/MCP result and deliver ACCO's compact
+  recoverable representation through bounded additional context. Project hook
+  trust remains controlled by Codex.
 - Gemini CLI: native decision/reason and event-specific context fields; accepted
   large replaceable tool results use AfterTool result hiding with ACCO's compact
   recoverable representation as the replacement reason.

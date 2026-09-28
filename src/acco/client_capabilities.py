@@ -69,10 +69,16 @@ CLIENT_CAPABILITIES = {
     ),
     "codex": _caps(
         "codex",
-        "ACCO treats MCP/context integration as reliable and host hooks as conditional.",
+        (
+            "ACCO installs Codex project lifecycle hooks for Bash guards, "
+            "prompt/session context, compaction checkpoints, and recoverable "
+            "PostToolUse replacement for Bash/MCP output. Codex requires "
+            "project hook trust and can disable hooks, so native guarantees "
+            "remain conditional until the host activates the hook definition."
+        ),
         pre_tool_intercept="conditional",
         post_tool_replace="conditional",
-        prompt_ingress="no",
+        prompt_ingress="conditional",
         session_hooks="conditional",
         mcp="yes",
         dynamic_mcp_refresh="conditional",

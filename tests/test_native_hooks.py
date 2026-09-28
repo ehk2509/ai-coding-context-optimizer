@@ -243,3 +243,176 @@ def test_native_hook_results_are_json_serializable():
     )
 
     assert json.loads(json.dumps(result)) == result
+
+
+def test_codex_normalizes_bash_and_string_tool_response(tmp_path):
+    """Codex local-tool payloads should enter the shared runtime without loss."""
+    payload = normalize_payload(
+        "codex",
+        "PostToolUse",
+        {
+            "cwd": str(tmp_path),
+            "session_id": "thr_1",
+            "model": "gpt-6-codex",
+            "tool_name": "Bash",
+            "tool_input": {"command": "pytest -q"},
+            "tool_response": "all tests passed",
+        },
+    )
+
+    assert payload["hook_event_name"] == "PostToolUse"
+    assert payload["tool_name"] == "Bash"
+    assert payload["tool_response"] == {
+        "stdout": "all tests passed",
+        "stderr": "",
+        "interrupted": False,
+        "isImage": False,
+        "exit_code": 0,
+    }
+
+
+def test_codex_pretool_guard_blocks_large_cat(tmp_path, monkeypatch):
+    """Codex PreToolUse should reuse ACCO's existing large-source Bash guard."""
+    monkeypatch.setenv("ACCO_STATE_DIR", str(tmp_path / "state"))
+    source = tmp_path / "large.py"
+    source.write_text(
+        "\n".join(f"value_{index} = {index}" for index in range(300)),
+        encoding="utf-8",
+    )
+
+    result = run_native_hook(
+        "codex",
+        "PreToolUse",
+        {
+            "cwd": str(tmp_path),
+            "session_id": "thr_1",
+            "tool_name": "Bash",
+            "tool_input": {"command": f"cat {source.name}"},
+        },
+    )
+
+    specific = result["hookSpecificOutput"]
+    assert specific["hookEventName"] == "PreToolUse"
+    assert specific["permissionDecision"] == "deny"
+    assert "acco blocked" in specific["permissionDecisionReason"]
+
+
+def test_codex_posttool_replaces_large_result_without_rejecting_code_mode(
+    tmp_path, monkeypatch
+):
+    """Codex should suppress the original result and deliver recoverable compact context."""
+    monkeypatch.setenv("ACCO_STATE_DIR", str(tmp_path / "state"))
+    original = _large_output()
+
+    result = run_native_hook(
+        "codex",
+        "PostToolUse",
+        {
+            "cwd": str(tmp_path),
+            "session_id": "thr_1",
+            "tool_name": "Bash",
+            "tool_input": {"command": "custom-build"},
+            "tool_response": original,
+        },
+    )
+
+    assert result["continue"] is False
+    compact = result["hookSpecificOutput"]["additionalContext"]
+    assert len(compact) < len(original)
+    assert "acco recovery:" in compact
+    assert original not in compact
+    assert "decision" not in result
+
+
+def test_codex_prompt_ingress_and_policy_use_native_context_fields():
+    """Codex UserPromptSubmit should map both block and developer-context outputs."""
+    blocked = adapt_response(
+        "codex",
+        "UserPromptSubmit",
+        {
+            "decision": "block",
+            "reason": "stage this oversized prompt",
+        },
+    )
+    assert blocked == {
+        "decision": "block",
+        "reason": "stage this oversized prompt",
+    }
+
+    allowed = adapt_response(
+        "codex",
+        "UserPromptSubmit",
+        {
+            "hookSpecificOutput": {
+                "hookEventName": "UserPromptSubmit",
+                "additionalContext": "bounded ACCO policy",
+            },
+            "systemMessage": "lifecycle note",
+        },
+    )
+    assert allowed == {
+        "hookSpecificOutput": {
+            "hookEventName": "UserPromptSubmit",
+            "additionalContext": "bounded ACCO policy",
+        },
+        "systemMessage": "lifecycle note",
+    }
+
+
+def test_codex_session_start_maps_continuity_to_developer_context():
+    """Codex SessionStart should receive ACCO's bounded continuity checkpoint."""
+    result = adapt_response(
+        "codex",
+        "SessionStart",
+        {
+            "hookSpecificOutput": {
+                "hookEventName": "SessionStart",
+                "additionalContext": "continue from tests/test_parser.py",
+            }
+        },
+    )
+
+    assert result == {
+        "hookSpecificOutput": {
+            "hookEventName": "SessionStart",
+            "additionalContext": "continue from tests/test_parser.py",
+        }
+    }
+
+
+def test_codex_mcp_result_uses_generic_recoverable_output_pipeline(
+    tmp_path, monkeypatch
+):
+    """Codex MCP tool output should be compressible without a host-specific processor."""
+    monkeypatch.setenv("ACCO_STATE_DIR", str(tmp_path / "state"))
+    original = _large_output()
+
+    normalized = normalize_payload(
+        "codex",
+        "PostToolUse",
+        {
+            "cwd": str(tmp_path),
+            "session_id": "thr_mcp",
+            "tool_name": "mcp__github__search",
+            "tool_input": {"query": "open issues"},
+            "tool_response": {"content": original},
+        },
+    )
+    assert normalized["tool_name"] == "GenericOutput"
+
+    result = run_native_hook(
+        "codex",
+        "PostToolUse",
+        {
+            "cwd": str(tmp_path),
+            "session_id": "thr_mcp",
+            "tool_name": "mcp__github__search",
+            "tool_input": {"query": "open issues"},
+            "tool_response": {"content": original},
+        },
+    )
+
+    assert result["continue"] is False
+    compact = result["hookSpecificOutput"]["additionalContext"]
+    assert len(compact) < len(original)
+    assert "acco recovery:" in compact

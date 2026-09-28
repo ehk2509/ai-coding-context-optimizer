@@ -195,7 +195,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="acco hook")
     parser.add_argument(
         "--host",
-        choices=["claude", "cursor", "gemini", "qwen", "copilot"],
+        choices=["claude", "cursor", "gemini", "qwen", "copilot", "codex"],
         default="claude",
     )
     parser.add_argument("--event")

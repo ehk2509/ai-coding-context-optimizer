@@ -448,7 +448,14 @@ through the host's native MCP registry; the VS Code workspace MCP surface remain
 
 ### Codex
 
-Setup manages only the block between:
+Setup manages two independent surfaces:
+
+```text
+~/.codex/config.toml → ACCO-marked MCP block
+.codex/hooks.json    → only commands prefixed with "acco hook --host codex --event "
+```
+
+The MCP block remains bounded by:
 
 ```toml
 # >>> acco managed >>>
@@ -457,7 +464,15 @@ Setup manages only the block between:
 ```
 
 If an unmanaged `[mcp_servers.acco]` already exists, setup refuses to
-overwrite it.
+overwrite it. ACCO also refuses to create `.codex/hooks.json` when that project
+layer already defines inline `[hooks...]` / `[[hooks...]]` tables, avoiding
+mixed hook representations. Existing unrelated groups in `hooks.json` are
+preserved. Setup is byte-stable when the managed definition is unchanged, which
+avoids unnecessary Codex hook-trust hash churn.
+
+Codex remains the authority for trusting/enabling project hooks. After first
+installation or an intentional definition change, review the project hook in
+Codex's `/hooks` UI; ACCO does not auto-approve executable project hooks.
 
 ## Mutation safety
 

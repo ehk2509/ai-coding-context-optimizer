@@ -10,6 +10,7 @@ from acco.integration_setup import (
     uninstall_integrations,
 )
 from acco.native_hook_configs import (
+    codex_hooks_path,
     cursor_hooks_path,
     gemini_settings_path,
     native_hooks_configured,
@@ -103,3 +104,41 @@ def test_setup_all_detects_new_native_hook_hosts(tmp_path):
 
     assert result["requested_hosts"] == ["gemini", "qwen"]
     assert result["configured_hosts"] == ["gemini", "qwen"]
+
+
+def test_setup_installs_codex_mcp_and_native_hooks(tmp_path):
+    """Codex setup should combine existing MCP setup with project lifecycle hooks."""
+    root = tmp_path / "repo"
+    home = tmp_path / "home"
+    root.mkdir()
+
+    result = setup_integrations(
+        root,
+        ("codex",),
+        home=home,
+        which=_which({"codex"}),
+    )
+
+    assert result["configured_hosts"] == ["codex"]
+    assert codex_hooks_path(root).is_file()
+    assert native_hooks_configured(root, "codex") is True
+
+    status = {
+        item.name: item
+        for item in detect_hosts(
+            root,
+            home=home,
+            which=_which({"codex"}),
+        )
+    }["codex"]
+    assert status.configured is True
+    assert status.details == ("mcp", "native-hooks", "hook-trust-review")
+    assert str(codex_hooks_path(root)) in status.config_paths
+
+    uninstall_integrations(
+        root,
+        ("codex",),
+        home=home,
+        which=_which({"codex"}),
+    )
+    assert native_hooks_configured(root, "codex") is False

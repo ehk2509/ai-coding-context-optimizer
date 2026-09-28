@@ -720,7 +720,7 @@ Native coding-agent hooks are transport adapters over the existing
 `HookRuntime`; they are not independent policy engines.
 
 ```text
-Cursor / Gemini / Qwen / Copilot native event
+Codex / Cursor / Gemini / Qwen / Copilot native event
         ↓
 native_hooks.normalize_payload
         ↓
@@ -738,19 +738,21 @@ routing advice, and efficiency telemetry stay in the same application services
 used by Claude Code.
 
 Host capability differences are explicit. Gemini and Copilot provide documented
-successful-result replacement semantics, so their post-tool adapters can run
-large Bash/Grep/WebFetch/WebSearch/MCP-style textual output through the ordinary
-output pipeline before it reaches the model. Cursor and Qwen do not expose a
-documented general successful-result replacement in their command-hook surfaces,
-so ACCO does not manufacture one: those hosts use pre-tool guards and supported
-prompt/session/compaction lifecycle hooks only.
+successful-result replacement semantics. Trusted Codex project hooks expose a
+documented PostToolUse stop-normal-processing path plus additional model context,
+which ACCO uses for recoverable replacement of local Bash/MCP results without
+claiming interception of hosted tools that bypass those events. Cursor and Qwen
+do not expose a documented general successful-result replacement in their
+command-hook surfaces, so ACCO does not manufacture one.
 
 `native_hook_configs.py` owns project configuration. Shared Cursor, Gemini, and
 Qwen JSON files are merged by removing/replacing only commands with ACCO's stable
-native-hook prefix. Copilot uses a dedicated `.github/hooks/acco.json`; an
-unmanaged file at that exact path is a hard preflight conflict. Setup preflights
-all selected surfaces before mutation, and uninstall removes only ACCO-owned
-entries.
+native-hook prefix. Codex additionally refuses to create a sibling
+`.codex/hooks.json` when the project layer already defines inline hook tables,
+and its idempotent JSON serialization keeps the reviewed hook definition stable
+across repairs. Copilot uses a dedicated `.github/hooks/acco.json`; an unmanaged
+file at that exact path is a hard preflight conflict. Setup preflights all
+selected surfaces before mutation, and uninstall removes only ACCO-owned entries.
 
 ## Hook boundary
 

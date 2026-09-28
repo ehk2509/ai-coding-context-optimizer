@@ -45,7 +45,7 @@ Supported automatic setup now covers:
 |---|---|
 | **Claude Code** | project hooks + project `.mcp.json` |
 | **Cursor** | project `.cursor/mcp.json` + `.cursor/hooks.json` native pre-tool/prompt/session hooks |
-| **Codex** | marked ACCO block in `~/.codex/config.toml` |
+| **Codex** | marked MCP block in `~/.codex/config.toml` + project `.codex/hooks.json` lifecycle hooks; project hooks require Codex trust review |
 | **OpenCode** | project `.opencode/opencode.json` using `mcp.servers` |
 | **OpenClaw** | native `openclaw mcp set/unset` registry |
 | **Hermes Agent** | marked entry under `mcp_servers` in `~/.hermes/config.yaml` |
@@ -82,7 +82,7 @@ block and refuses to overwrite an unowned `acco` entry.
 ### Native hook interception
 
 ACCO now uses one host-neutral `HookRuntime` behind native project hooks for
-Claude Code, Cursor, Gemini CLI, Qwen Code, and Copilot CLI. The adapters
+Claude Code, Codex, Cursor, Gemini CLI, Qwen Code, and Copilot CLI. The adapters
 translate only event/tool/result schemas; output compression, exact recovery,
 read guarding, prompt ingress, continuity, and efficiency policy remain
 single-sourced.
@@ -92,6 +92,7 @@ The enforced capabilities intentionally differ by host:
 | Host | Large Read / `cat` guard | Prompt ingress / lifecycle | Automatic successful tool-result replacement |
 |---|---|---|---|
 | Claude Code | yes | yes | Bash + eligible Read |
+| Codex | conditional until project hooks are trusted; Bash `cat` guard | conditional until trusted: prompt/session/compact/stop | conditional until trusted; local Bash/MCP results use `continue:false` + compact additional context |
 | Cursor | yes via `preToolUse` | prompt block + session/compact/stop | not for general built-in results; Cursor only documents replacement for MCP results |
 | Gemini CLI | yes via `BeforeTool` | yes via `BeforeAgent` / session hooks | yes; `AfterTool` can hide the original and use ACCO's compact result as replacement |
 | Qwen Code | yes via `PreToolUse` | conditional prompt ingress via provenance-carrying `submitted_prompt`; session hooks yes | no general successful-result rewrite; PostToolUse supports context/decisions only |
@@ -99,10 +100,12 @@ The enforced capabilities intentionally differ by host:
 
 For Gemini and Copilot, the replacement-capable post-tool adapter is deliberately
 broader than shell output: textual Grep/WebFetch/WebSearch/MCP-style results can
-flow through ACCO's generic/failure-aware output pipeline too. Read/Edit/Write
-results are not treated as generic command output. Oversized accepted
-transformations still receive the ordinary local `tsr_...` exact-recovery
-handle.
+flow through ACCO's generic/failure-aware output pipeline too. Trusted Codex
+project hooks apply the same pipeline to documented local Bash and MCP-style
+PostToolUse results; Codex hosted tools that do not emit these lifecycle events
+are not claimed as intercepted. Read/Edit/Write results are not treated as
+generic command output. Oversized accepted transformations still receive the
+ordinary local `tsr_...` exact-recovery handle.
 
 Cursor's `beforeSubmitPrompt` can block an oversized prompt, so ACCO can enforce
 lossless ingress staging there. It cannot inject ACCO's generation-policy text;
@@ -110,10 +113,15 @@ the adapter therefore disables that non-enforceable behavior instead of claiming
 it reached the model. Copilot command `userPromptSubmitted` output is likewise
 not used for ACCO prompt injection.
 
-Native configuration is idempotent and ownership-safe. Cursor/Gemini/Qwen merge
-only ACCO command entries into shared JSON. Copilot uses the dedicated
+Native configuration is idempotent and ownership-safe. Codex/Cursor/Gemini/Qwen
+merge only ACCO command entries into shared JSON. Copilot uses the dedicated
 `.github/hooks/acco.json` path and refuses to overwrite a non-ACCO file at that
-location. `acco uninstall` removes only those owned entries.
+location. For Codex, ACCO refuses to introduce `.codex/hooks.json` when the same
+project layer already defines inline hook tables, and rerunning setup keeps the
+hook file byte-stable so a previously trusted definition does not churn
+unnecessarily. Codex still controls project hook trust; review/enable the ACCO
+definition with the host's `/hooks` UI. `acco uninstall` removes only owned
+entries.
 
 The files under `integrations/` remain manual fallback/reference templates.
 
