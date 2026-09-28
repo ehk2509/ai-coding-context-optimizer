@@ -38,7 +38,7 @@ available without crowding onboarding.
 The repository also exposes a Claude-only marketplace:
 
 ```text
-/plugin marketplace add elyeshkiri/ai-coding-context-optimizer
+/plugin marketplace add ehk2509/ai-coding-context-optimizer
 /plugin install acco@acco-tools
 ```
 
