@@ -1,4 +1,50 @@
-# Validation for 1.22.1
+# Validation for 1.23.0
+
+## 1.23 out-of-context execution and native host interception
+
+Version 1.23 expands ACCO's runtime context-control boundary without replacing
+repository retrieval/ranking authority.
+
+Mechanical validation covers:
+
+- restricted out-of-context execution over explicit repository-contained text
+  inputs with bounded file count, total input bytes, program size, wall-clock
+  time, JSON result size, UTF-8 transport, repository path containment, and
+  exact recovery for oversized computed results;
+- parity of the execution primitive across MCP, Python SDK, loopback SDK bridge,
+  TypeScript client, and frozen standalone executables, including the private
+  standalone worker re-entry path that does not require an external Python
+  interpreter;
+- native hook transport adapters for Cursor, Gemini CLI, Qwen Code, Copilot CLI,
+  and Codex, all delegating to the same host-neutral `HookRuntime` rather than
+  reimplementing domain policy;
+- host-specific capability honesty: direct successful-result replacement for
+  Gemini/Copilot, trust-conditional local Bash/MCP replacement for Codex, and no
+  general successful-result rewrite claim for Qwen or Cursor built-in tools;
+- idempotent ownership-safe project configuration, including preservation of
+  unrelated user hooks and Codex hook-definition byte stability across repair
+  runs;
+- the prompt-derived task checklist added after the 144-run study exposed a
+  focused-verification failure on a second explicitly named code path;
+- the complete 19-job CI matrix used by the merged feature PRs, including
+  Python 3.10/3.12/3.13, native Windows full-suite/retrieval/product-UX gates,
+  TypeScript SDK, Rust/HNSW parity, frozen retrieval holdout, ranking
+  regression, real CLI-output corpora, and standalone Linux/macOS/Windows
+  x86_64 and ARM64 smoke tests.
+
+The 144-run paired SWE-bench subscription study is retained as
+**non-publishable evidence**. It measured 55/72 successful ACCO runs versus
+56/72 for plain Claude Code while observing 25.6% fewer total tokens, 20.3%
+fewer model calls, and 21.1% lower equivalent cost per successful task. The
+suite had been adapted for local subscription/task-image execution rather than
+frozen before evaluation, and success was one run lower in the ACCO arm.
+**No 144-run aggregate savings claim** is therefore made for 1.23.0.
+
+The new native-hook and execution features were added after that experiment, so
+the study also does not establish their incremental end-to-end benefit. A fresh
+frozen paired experiment with independent task verification, host-interception
+telemetry, execution-use attribution, and quality/success parity remains the
+next evidence requirement.
 
 ## 1.22.1 repository identity migration
 
