@@ -264,7 +264,7 @@ def test_frozen_winget_update_preserves_package_manager(monkeypatch, capsys):
         "winget",
         "upgrade",
         "--id",
-        "ElyesHkiri.ACCO",
+        "ehk2509.ACCO",
         "--exact",
     ]
 
