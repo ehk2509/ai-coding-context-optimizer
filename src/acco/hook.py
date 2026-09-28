@@ -25,6 +25,7 @@ from .estimate import estimate_tokens
 from .output import OutputPipeline
 from .output_telemetry import finish_output_turn, start_output_turn
 from .generation_policy import automatic_output_policy
+from .task_checklist import task_checklist_note
 from .model_routing import automatic_model_route
 from .ingress import maybe_stage_prompt
 from .guard import _digest, run as guard_run
@@ -59,6 +60,7 @@ def _config_from_env(root: Path | None = None) -> HookConfig:
         max_lines=settings.max_lines,
         min_net_tokens=MIN_NET_TOKENS,
         output_policy_enabled=settings.output_policy,
+        task_checklist_enabled=settings.output_task_checklist,
         output_policy_mode=settings.output_mode,
         output_policy_task=settings.output_task,
         output_policy_adaptive=settings.output_adaptive,
@@ -109,6 +111,7 @@ def _services() -> HookServices:
         store_output=store_output_service,
         user_nudge=user_nudge,
         generation_policy=automatic_output_policy,
+        task_checklist=task_checklist_note,
         reset_session=reset_session,
         record_read=record_read,
         digest=_digest,

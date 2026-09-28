@@ -28,6 +28,7 @@ allow = []
 
 [output]
 enabled = true
+task_checklist = true
 mode = "normal"
 task = "auto"
 adaptive = true
@@ -114,6 +115,7 @@ follow-ups inherit the current session class without another policy injection.
 | TOML key | Default | Meaning |
 |---|---:|---|
 | `output.enabled` | `true` | Enable automatic generation-policy injection where the host supports prompt hooks. |
+| `output.task_checklist` | `true` | When a prompt explicitly names another affected path or API ("also reproduces with `scatterplot`"), inject a short checklist of the named items to verify before finishing. Requires `output.enabled`. |
 | `output.mode` | `"normal"` | Default response mode: `terse`, `normal`, or `detailed`. |
 | `output.task` | `"auto"` | Task policy: `auto`, `general`, `coding`, `debugging`, `review`, `explanation`, or `planning`. |
 | `output.adaptive` | `true` | Scale the task/mode base budget using deterministic prompt-complexity signals. |
@@ -326,6 +328,7 @@ Environment variables take precedence over TOML:
 | `ACCO_MAX_LINES` | `hooks.max_lines` |
 | `ACCO_KEEP_TAIL` | `hooks.keep_tail` |
 | `ACCO_OUTPUT_POLICY` | `output.enabled` |
+| `ACCO_TASK_CHECKLIST` | `output.task_checklist` |
 | `ACCO_OUTPUT_MODE` | `output.mode` |
 | `ACCO_OUTPUT_TASK` | `output.task` |
 | `ACCO_OUTPUT_ADAPTIVE` | `output.adaptive` |

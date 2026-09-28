@@ -699,3 +699,60 @@ def test_runtime_never_proxies_bounded_read(tmp_path):
 
     assert result == (0, None)
     assert calls == []
+
+
+def test_runtime_appends_task_checklist_after_generation_policy(tmp_path):
+    """Prompt-specific checklists ride along with the output policy."""
+    prompts = []
+    runtime = HookRuntime(
+        _services(
+            generation_policy=lambda root, prompt, **kwargs: "generation contract",
+            task_checklist=lambda prompt: prompts.append(prompt) or "task checklist",
+        ),
+        HookConfig(output_policy_enabled=True),
+    )
+
+    code, response = runtime.run(
+        {"hook_event_name": "UserPromptSubmit", "cwd": str(tmp_path), "prompt": "fix it"}
+    )
+
+    assert code == 0
+    assert response["hookSpecificOutput"]["additionalContext"] == (
+        "generation contract\n\ntask checklist"
+    )
+    assert prompts == ["fix it"]
+
+
+def test_runtime_skips_task_checklist_when_output_policy_disabled(tmp_path):
+    """Disabling the output policy also disables the prompt checklist."""
+    calls = []
+    runtime = HookRuntime(
+        _services(task_checklist=lambda prompt: calls.append(prompt) or "task checklist"),
+        HookConfig(output_policy_enabled=False),
+    )
+
+    runtime.run(
+        {"hook_event_name": "UserPromptSubmit", "cwd": str(tmp_path), "prompt": "fix it"}
+    )
+
+    assert calls == []
+
+
+def test_runtime_task_checklist_switch_keeps_policy(tmp_path):
+    """task_checklist_enabled=False drops only the checklist, not the policy."""
+    calls = []
+    runtime = HookRuntime(
+        _services(
+            generation_policy=lambda root, prompt, **kwargs: "generation contract",
+            task_checklist=lambda prompt: calls.append(prompt) or "task checklist",
+        ),
+        HookConfig(output_policy_enabled=True, task_checklist_enabled=False),
+    )
+
+    code, response = runtime.run(
+        {"hook_event_name": "UserPromptSubmit", "cwd": str(tmp_path), "prompt": "fix it"}
+    )
+
+    assert code == 0
+    assert response["hookSpecificOutput"]["additionalContext"] == "generation contract"
+    assert calls == []

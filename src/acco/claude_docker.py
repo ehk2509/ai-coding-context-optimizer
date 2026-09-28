@@ -263,6 +263,7 @@ def run(
         "ACCO_CROSS_TURN_DEDUP",
         "ACCO_WASTE_DETECTION",
         "ACCO_OUTPUT_POLICY",
+        "ACCO_TASK_CHECKLIST",
     ):
         _docker_env(command, name)
     if auth == "api":

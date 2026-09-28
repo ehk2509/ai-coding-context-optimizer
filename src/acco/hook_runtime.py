@@ -22,6 +22,7 @@ StoreOutputService = Callable[[dict], str]
 RecoveryOutputService = Callable[..., str | None]
 UserNudgeService = Callable[[Path, str], str | None]
 GenerationPolicyService = Callable[..., str | None]
+TaskChecklistService = Callable[..., str | None]
 ModelRoutingService = Callable[..., str | None]
 ResetSessionService = Callable[..., None]
 RecordReadService = Callable[..., None]
@@ -124,6 +125,7 @@ class HookConfig:
     min_net_tokens: int = MIN_NET_TOKENS
     filterable_tools: frozenset[str] = DEFAULT_FILTERABLE_TOOLS
     output_policy_enabled: bool = True
+    task_checklist_enabled: bool = True
     output_policy_mode: str = "normal"
     output_policy_task: str = "auto"
     output_policy_adaptive: bool = True
@@ -182,6 +184,7 @@ class HookServices:
     ingress_optimizer: IngressOptimizerService = _noop_ingress
     smart_read_proxy: SmartReadProxyService = _noop_smart_read
     model_route: ModelRoutingService = _noop_context
+    task_checklist: TaskChecklistService = _noop_context
     recovery_output: RecoveryOutputService = _noop_recovery
 
 
@@ -499,6 +502,15 @@ class HookRuntime:
             )
             if generation_note:
                 context_notes.append(generation_note)
+            # Unlike the policy (re-sent only when it changes), the checklist is
+            # specific to each prompt's own named reproductions and paths.
+            checklist_note = (
+                self.services.task_checklist(prompt)
+                if self.config.task_checklist_enabled
+                else None
+            )
+            if checklist_note:
+                context_notes.append(checklist_note)
 
         routing_note = self.services.model_route(
             root,
