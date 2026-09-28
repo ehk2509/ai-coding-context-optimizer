@@ -54,19 +54,23 @@ from .host_configs import (
     validate_opencode_manageable,
 )
 from .native_hook_configs import (
+    codex_hooks_path,
     copilot_hooks_path,
     cursor_hooks_path,
     gemini_settings_path,
+    install_codex_hooks,
     install_copilot_hooks,
     install_cursor_hooks,
     install_gemini_hooks,
     install_qwen_hooks,
     native_hooks_configured,
     qwen_settings_path,
+    uninstall_codex_hooks,
     uninstall_copilot_hooks,
     uninstall_cursor_hooks,
     uninstall_gemini_hooks,
     uninstall_qwen_hooks,
+    validate_codex_hooks_manageable,
     validate_copilot_hooks_manageable,
 )
 from .policy import SKILL_TEXT
@@ -461,6 +465,7 @@ def detect_hosts(
     gemini_path = gemini_settings_path(root)
     qwen_path = qwen_settings_path(root)
     codex_path = codex_config_path(home)
+    codex_native_path = codex_hooks_path(root)
     codex_text = codex_path.read_text(encoding="utf-8") if codex_path.exists() else ""
     opencode_path = opencode_mcp_path(root)
     openclaw_path = openclaw_config_path(home)
@@ -501,11 +506,17 @@ def detect_hosts(
         ),
         HostStatus(
             "codex",
-            bool(executable["codex"] or (home / ".codex").exists()),
-            CODEX_START in codex_text and CODEX_END in codex_text,
+            bool(
+                executable["codex"]
+                or (home / ".codex").exists()
+                or (root / ".codex").exists()
+            ),
+            CODEX_START in codex_text
+            and CODEX_END in codex_text
+            and native_hooks_configured(root, "codex"),
             executable["codex"],
-            (str(codex_path),),
-            ("mcp",),
+            (str(codex_path), str(codex_native_path)),
+            ("mcp", "native-hooks", "hook-trust-review"),
         ),
         HostStatus(
             "opencode",
@@ -644,6 +655,8 @@ def setup_integrations(
         _validate_json_object(cursor_hooks_path(root))
     if "codex" in requested:
         _validate_codex_manageable(codex_config_path(home))
+        _validate_json_object(codex_hooks_path(root))
+        validate_codex_hooks_manageable(root)
     if "opencode" in requested:
         validate_opencode_manageable(root)
         _validate_json_object(opencode_mcp_path(root))
@@ -693,6 +706,7 @@ def setup_integrations(
         changed.append("cursor")
     if "codex" in requested:
         _install_codex(codex_config_path(home))
+        install_codex_hooks(root)
         changed.append("codex")
     if "opencode" in requested:
         install_opencode(root)
@@ -762,6 +776,10 @@ def uninstall_integrations(
     if "cursor" in requested:
         _validate_json_object(cursor_mcp_path(root))
         _validate_json_object(cursor_hooks_path(root))
+    if "codex" in requested:
+        _validate_codex_manageable(codex_config_path(home))
+        _validate_json_object(codex_hooks_path(root))
+        validate_codex_hooks_manageable(root)
     if "opencode" in requested:
         _validate_json_object(opencode_mcp_path(root))
     if "copilot" in requested:
@@ -811,6 +829,7 @@ def uninstall_integrations(
         removed.append("cursor")
     if "codex" in requested:
         _uninstall_codex(codex_config_path(home))
+        uninstall_codex_hooks(root)
         removed.append("codex")
     if "opencode" in requested:
         uninstall_opencode(root)
