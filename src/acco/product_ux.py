@@ -26,6 +26,7 @@ STARTABLE_HOSTS = (
     "claude",
     "codex",
     "gemini",
+    "qwen",
     "cursor",
     "opencode",
     "openclaw",

@@ -11,6 +11,32 @@ recovery, and transcript analysis run locally.
 Optional external/model integrations can have their own network behavior; use
 their documentation and credentials deliberately.
 
+## Native coding-agent hooks
+
+`acco setup` can install project-level command hooks for Claude Code, Cursor,
+Gemini CLI, Qwen Code, and Copilot CLI. Those hooks execute the local `acco`
+binary with the current user's privileges and receive the host's documented
+event payload over stdin.
+
+ACCO treats native hooks as a local optimization boundary:
+
+- hook input is processed transiently by the same host-neutral `HookRuntime`
+  used by Claude Code;
+- diagnostics go to stderr; adapters keep stdout reserved for the host's strict
+  JSON response contract;
+- ACCO does not add hook-payload logging as part of these adapters;
+- large original outputs that are safely replaced may enter ACCO's existing
+  private exact-recovery/output stores under their normal retention rules;
+- Cursor/Gemini/Qwen shared JSON is mutated only for ACCO-owned command entries;
+  Copilot uses a dedicated `.github/hooks/acco.json` and refuses to replace a
+  non-ACCO document at that path.
+
+Project hook configuration is executable configuration. Review hooks from
+untrusted repositories before opening/running their coding agent, and use each
+host's repository-trust controls where available. ACCO's ownership checks prevent
+it from silently taking over unrelated hook entries; they do not make arbitrary
+third-party hooks safe.
+
 ## Out-of-context programmable execution
 
 The MCP `execute` tool and SDK `execute` method are designed for local

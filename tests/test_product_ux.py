@@ -140,6 +140,27 @@ def test_start_auto_selects_single_agent_and_warms_index(
     assert payload["index"]["files"] >= 1
 
 
+def test_start_can_launch_qwen_as_managed_native_hook_host(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+):
+    """Qwen should participate in the ordinary setup-to-start product flow."""
+    (tmp_path / "app.py").write_text("value = 1\n", encoding="utf-8")
+    monkeypatch.setattr(
+        product.shutil,
+        "which",
+        lambda name: "/usr/bin/qwen" if name == "qwen" else None,
+    )
+
+    assert product.start_main(
+        [str(tmp_path), "--agent", "qwen", "--dry-run", "--json"]
+    ) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["agent"] == "qwen"
+    assert payload["provider_wrapper"] is False
+
+
 def test_start_remembers_explicit_preference(tmp_path: Path, monkeypatch):
     """A chosen start host should be reusable without changing project files."""
     monkeypatch.setenv("ACCO_STATE_DIR", str(tmp_path / "state"))

@@ -53,6 +53,22 @@ from .host_configs import (
     validate_hermes_manageable,
     validate_opencode_manageable,
 )
+from .native_hook_configs import (
+    copilot_hooks_path,
+    cursor_hooks_path,
+    gemini_settings_path,
+    install_copilot_hooks,
+    install_cursor_hooks,
+    install_gemini_hooks,
+    install_qwen_hooks,
+    native_hooks_configured,
+    qwen_settings_path,
+    uninstall_copilot_hooks,
+    uninstall_cursor_hooks,
+    uninstall_gemini_hooks,
+    uninstall_qwen_hooks,
+    validate_copilot_hooks_manageable,
+)
 from .policy import SKILL_TEXT
 from .repository_service import RepositoryContextService
 from .runtime_config import CONFIG_NAME, find_project_config, settings_for
@@ -67,6 +83,8 @@ HOSTS = (
     "hermes",
     "copilot",
     "antigravity",
+    "gemini",
+    "qwen",
 )
 HOST_EXECUTABLES = {
     "claude": "claude",
@@ -77,6 +95,8 @@ HOST_EXECUTABLES = {
     "hermes": "hermes",
     "copilot": "copilot",
     "antigravity": "agy",
+    "gemini": "gemini",
+    "qwen": "qwen",
 }
 CODEX_START = "# >>> acco managed >>>"
 CODEX_END = "# <<< acco managed <<<"
@@ -437,6 +457,9 @@ def detect_hosts(
     }
     claude_paths = (claude_settings_path(root), claude_mcp_path(root))
     cursor_path = cursor_mcp_path(root)
+    cursor_native_path = cursor_hooks_path(root)
+    gemini_path = gemini_settings_path(root)
+    qwen_path = qwen_settings_path(root)
     codex_path = codex_config_path(home)
     codex_text = codex_path.read_text(encoding="utf-8") if codex_path.exists() else ""
     opencode_path = opencode_mcp_path(root)
@@ -470,10 +493,11 @@ def detect_hosts(
                 or (home / ".cursor").exists()
                 or (root / ".cursor").exists()
             ),
-            _json_mcp_configured(cursor_path),
+            _json_mcp_configured(cursor_path)
+            and native_hooks_configured(root, "cursor"),
             executable["cursor"],
-            (str(cursor_path),),
-            ("mcp",),
+            (str(cursor_path), str(cursor_native_path)),
+            ("mcp", "native-hooks"),
         ),
         HostStatus(
             "codex",
@@ -519,12 +543,20 @@ def detect_hosts(
                 home=home,
                 cli_required=copilot_cli_surface,
                 vscode_required=copilot_vscode_surface,
+            )
+            and (
+                not copilot_cli_surface
+                or native_hooks_configured(root, "copilot")
             ),
             copilot_executable,
-            (str(copilot_cli_path), str(copilot_path)),
+            (
+                str(copilot_cli_path),
+                str(copilot_path),
+                str(copilot_hooks_path(root)),
+            ),
             tuple(
                 ["mcp"]
-                + (["copilot-cli"] if copilot_cli_surface else [])
+                + (["copilot-cli", "native-hooks"] if copilot_cli_surface else [])
                 + (["vscode-workspace"] if copilot_vscode_surface else [])
             ),
         ),
@@ -539,6 +571,30 @@ def detect_hosts(
             executable["antigravity"],
             (str(antigravity_path), str(antigravity_global)),
             ("mcp", "workspace-local"),
+        ),
+        HostStatus(
+            "gemini",
+            bool(
+                executable["gemini"]
+                or (root / ".gemini").exists()
+                or (home / ".gemini").exists()
+            ),
+            native_hooks_configured(root, "gemini"),
+            executable["gemini"],
+            (str(gemini_path),),
+            ("native-hooks", "project-local"),
+        ),
+        HostStatus(
+            "qwen",
+            bool(
+                executable["qwen"]
+                or (root / ".qwen").exists()
+                or (home / ".qwen").exists()
+            ),
+            native_hooks_configured(root, "qwen"),
+            executable["qwen"],
+            (str(qwen_path),),
+            ("native-hooks", "project-local"),
         ),
     ]
 
@@ -585,6 +641,7 @@ def setup_integrations(
         _validate_json_object(claude_mcp_path(root))
     if "cursor" in requested:
         _validate_json_object(cursor_mcp_path(root))
+        _validate_json_object(cursor_hooks_path(root))
     if "codex" in requested:
         _validate_codex_manageable(codex_config_path(home))
     if "opencode" in requested:
@@ -603,10 +660,15 @@ def setup_integrations(
             )
         if copilot_cli_surface:
             validate_copilot_cli_manageable(home)
+            validate_copilot_hooks_manageable(root)
         if copilot_vscode_surface:
             _validate_json_object(copilot_mcp_path(root))
     if "antigravity" in requested:
         _validate_json_object(antigravity_mcp_path(root))
+    if "gemini" in requested:
+        _validate_json_object(gemini_settings_path(root))
+    if "qwen" in requested:
+        _validate_json_object(qwen_settings_path(root))
     if "hermes" in requested:
         validate_hermes_manageable(hermes_config_path(home))
     if "openclaw" in requested and not which(HOST_EXECUTABLES["openclaw"]):
@@ -625,7 +687,9 @@ def setup_integrations(
             lean_skill = _ensure_managed_lean_skill(root)
         changed.append("claude")
     if "cursor" in requested:
+        cursor_mcp_path(root).parent.mkdir(parents=True, exist_ok=True)
         update_json(cursor_mcp_path(root), _merge_mcp(root))
+        install_cursor_hooks(root)
         changed.append("cursor")
     if "codex" in requested:
         _install_codex(codex_config_path(home))
@@ -648,12 +712,20 @@ def setup_integrations(
         )
         if cli_executable:
             install_copilot_cli(home=home, runner=runner)
+        if copilot_cli_surface:
+            install_copilot_hooks(root)
         if copilot_vscode_surface:
             install_copilot_vscode(root)
         changed.append("copilot")
     if "antigravity" in requested:
         install_antigravity(root)
         changed.append("antigravity")
+    if "gemini" in requested:
+        install_gemini_hooks(root)
+        changed.append("gemini")
+    if "qwen" in requested:
+        install_qwen_hooks(root)
+        changed.append("qwen")
 
     return {
         "root": str(root),
@@ -689,11 +761,14 @@ def uninstall_integrations(
         _validate_json_object(claude_mcp_path(root))
     if "cursor" in requested:
         _validate_json_object(cursor_mcp_path(root))
+        _validate_json_object(cursor_hooks_path(root))
     if "opencode" in requested:
         _validate_json_object(opencode_mcp_path(root))
     if "copilot" in requested:
         if copilot_vscode_configured(root):
             _validate_json_object(copilot_mcp_path(root))
+        if copilot_hooks_path(root).exists():
+            validate_copilot_hooks_manageable(root)
         if copilot_cli_configured(home):
             validate_copilot_cli_manageable(home)
             if not which(HOST_EXECUTABLES["copilot"]):
@@ -703,6 +778,10 @@ def uninstall_integrations(
                 )
     if "antigravity" in requested:
         _validate_json_object(antigravity_mcp_path(root))
+    if "gemini" in requested:
+        _validate_json_object(gemini_settings_path(root))
+    if "qwen" in requested:
+        _validate_json_object(qwen_settings_path(root))
     if "hermes" in requested:
         validate_hermes_manageable(hermes_config_path(home))
     if (
@@ -728,6 +807,7 @@ def uninstall_integrations(
         path = cursor_mcp_path(root)
         if path.exists():
             update_json(path, _remove_mcp)
+        uninstall_cursor_hooks(root)
         removed.append("cursor")
     if "codex" in requested:
         _uninstall_codex(codex_config_path(home))
@@ -742,6 +822,8 @@ def uninstall_integrations(
         uninstall_hermes(home)
         removed.append("hermes")
     if "copilot" in requested:
+        if copilot_hooks_path(root).exists():
+            uninstall_copilot_hooks(root)
         if copilot_cli_configured(home):
             uninstall_copilot_cli(home=home, runner=runner)
         uninstall_copilot_vscode(root)
@@ -749,6 +831,12 @@ def uninstall_integrations(
     if "antigravity" in requested:
         uninstall_antigravity(root)
         removed.append("antigravity")
+    if "gemini" in requested:
+        uninstall_gemini_hooks(root)
+        removed.append("gemini")
+    if "qwen" in requested:
+        uninstall_qwen_hooks(root)
+        removed.append("qwen")
     config = root / CONFIG_NAME
     if remove_config and config.exists():
         config.unlink()

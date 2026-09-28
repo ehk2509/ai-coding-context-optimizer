@@ -59,13 +59,14 @@ acco setup . --host claude
 acco setup . --host cursor --host codex
 acco setup . --host opencode --host hermes
 acco setup . --host copilot --host antigravity
+acco setup . --host gemini --host qwen
 acco setup . --host openclaw
 acco setup . --host all
 ```
 
 Setup is idempotent. `--host all` means all detected supported hosts, not every
 product ACCO knows about. Re-running setup after an upgrade is the
-supported repair/migration path.
+supported repair/migration path. Native host hooks are installed for Cursor, Gemini CLI, Qwen Code, and Copilot CLI when those surfaces are selected or detected.
 
 ## 3. Start coding
 

@@ -6,6 +6,7 @@ import inspect
 import acco.command_handlers.context as context_commands
 import acco.commands as commands_facade
 import acco.mcp_server.tools as mcp_tools
+import acco.native_hooks as native_hooks
 import acco.pack_cli as pack_cli
 from acco.command_handlers.context import browse_main as vertical_browse_main
 from acco.command_registry import (
@@ -132,3 +133,19 @@ def test_repository_integrations_use_application_service_boundary():
             for alias in node.names
         }
         assert forbidden.isdisjoint(imported)
+
+
+def test_native_hook_adapters_translate_without_owning_domain_policy():
+    """Non-Claude hook adapters must reuse the shared runtime instead of forking policy."""
+    source = inspect.getsource(native_hooks)
+
+    assert "build_hook_runtime" in source
+    for forbidden in (
+        "OutputPipeline",
+        "RecoveryStore",
+        "decide_read",
+        "route_context",
+        "automatic_output_policy",
+        "automatic_model_route",
+    ):
+        assert forbidden not in source

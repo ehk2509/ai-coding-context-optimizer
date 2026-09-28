@@ -11,7 +11,7 @@ acco uninstall [path] [--host HOST|all ...] [--remove-config] [--json]
 ## Arguments and options
 
 - `path` default `.`.
-- `--host` repeatable; default is all supported hosts: `claude`, `cursor`, `codex`, `opencode`, `openclaw`, `hermes`, `copilot`, and `antigravity`.
+- `--host` repeatable; default is all supported hosts: `claude`, `cursor`, `codex`, `opencode`, `openclaw`, `hermes`, `copilot`, `antigravity`, `gemini`, and `qwen`.
 - `--remove-config` also removes `.acco.toml`.
 - `--json` emits lifecycle result.
 
@@ -21,7 +21,7 @@ acco uninstall [path] [--host HOST|all ...] [--remove-config] [--json]
 
 ## Output contract
 
-Human removal summary or JSON; see [Machine-readable contracts](../JSON_OUTPUTS.md#uninstall-json).
+Human removal summary or JSON. Shared Cursor/Gemini/Qwen hook files keep unrelated entries, while the dedicated Copilot `acco.json` hook file is removed only if it is still ACCO-owned; see [Machine-readable contracts](../JSON_OUTPUTS.md#uninstall-json).
 
 ## Authoritative runtime help
 

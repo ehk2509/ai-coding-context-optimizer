@@ -44,13 +44,15 @@ Supported automatic setup now covers:
 | Host | Managed integration |
 |---|---|
 | **Claude Code** | project hooks + project `.mcp.json` |
-| **Cursor** | project `.cursor/mcp.json` |
+| **Cursor** | project `.cursor/mcp.json` + `.cursor/hooks.json` native pre-tool/prompt/session hooks |
 | **Codex** | marked ACCO block in `~/.codex/config.toml` |
 | **OpenCode** | project `.opencode/opencode.json` using `mcp.servers` |
 | **OpenClaw** | native `openclaw mcp set/unset` registry |
 | **Hermes Agent** | marked entry under `mcp_servers` in `~/.hermes/config.yaml` |
-| **GitHub Copilot** | native Copilot CLI MCP registry (`~/.copilot/mcp-config.json`) and/or VS Code workspace `.vscode/mcp.json` |
+| **GitHub Copilot** | native Copilot CLI MCP registry + owned `.github/hooks/acco.json`; VS Code workspace `.vscode/mcp.json` when present |
 | **Google Antigravity** | workspace `.agents/mcp_config.json` using `mcpServers` |
+| **Gemini CLI** | project `.gemini/settings.json` native hooks |
+| **Qwen Code** | project `.qwen/settings.json` native hooks |
 
 Only ACCO-owned entries are changed. Setup is idempotent, so rerunning it
 after upgrades repairs/migrates managed entries without duplicating them. For
@@ -65,6 +67,7 @@ Use repeatable `--host` flags for explicit selection, for example:
 acco setup . --host codex --host cursor --host opencode
 acco setup . --host openclaw --host hermes
 acco setup . --host copilot --host antigravity
+acco setup . --host gemini --host qwen
 acco setup . --host all
 ```
 
@@ -75,6 +78,42 @@ VS Code Copilot surface remains workspace-scoped in `.vscode/mcp.json`. OpenCode
 closed instead of creating a second sibling config when
 `.opencode/opencode.jsonc` already exists. Hermes uses a clearly marked YAML
 block and refuses to overwrite an unowned `acco` entry.
+
+### Native hook interception
+
+ACCO now uses one host-neutral `HookRuntime` behind native project hooks for
+Claude Code, Cursor, Gemini CLI, Qwen Code, and Copilot CLI. The adapters
+translate only event/tool/result schemas; output compression, exact recovery,
+read guarding, prompt ingress, continuity, and efficiency policy remain
+single-sourced.
+
+The enforced capabilities intentionally differ by host:
+
+| Host | Large Read / `cat` guard | Prompt ingress / lifecycle | Automatic successful tool-result replacement |
+|---|---|---|---|
+| Claude Code | yes | yes | Bash + eligible Read |
+| Cursor | yes via `preToolUse` | prompt block + session/compact/stop | not for general built-in results; Cursor only documents replacement for MCP results |
+| Gemini CLI | yes via `BeforeTool` | yes via `BeforeAgent` / session hooks | yes; `AfterTool` can hide the original and use ACCO's compact result as replacement |
+| Qwen Code | yes via `PreToolUse` | conditional prompt ingress via provenance-carrying `submitted_prompt`; session hooks yes | no general successful-result rewrite; PostToolUse supports context/decisions only |
+| Copilot CLI | yes via `PreToolUse` | session/compact/stop; command prompt hooks cannot inject/modify the prompt | yes via `modifiedResult` |
+
+For Gemini and Copilot, the replacement-capable post-tool adapter is deliberately
+broader than shell output: textual Grep/WebFetch/WebSearch/MCP-style results can
+flow through ACCO's generic/failure-aware output pipeline too. Read/Edit/Write
+results are not treated as generic command output. Oversized accepted
+transformations still receive the ordinary local `tsr_...` exact-recovery
+handle.
+
+Cursor's `beforeSubmitPrompt` can block an oversized prompt, so ACCO can enforce
+lossless ingress staging there. It cannot inject ACCO's generation-policy text;
+the adapter therefore disables that non-enforceable behavior instead of claiming
+it reached the model. Copilot command `userPromptSubmitted` output is likewise
+not used for ACCO prompt injection.
+
+Native configuration is idempotent and ownership-safe. Cursor/Gemini/Qwen merge
+only ACCO command entries into shared JSON. Copilot uses the dedicated
+`.github/hooks/acco.json` path and refuses to overwrite a non-ACCO file at that
+location. `acco uninstall` removes only those owned entries.
 
 The files under `integrations/` remain manual fallback/reference templates.
 
@@ -292,10 +331,12 @@ max_ranges = 4
 max_range_lines = 80
 ```
 
-Automatic generation-policy injection currently uses Claude Code's prompt hook.
-Other supported hosts receive the same host-neutral policy/retrieval/routing
-surfaces through ACCO MCP. Their native lifecycle hooks are not assumed
-unless `acco client-capabilities --client HOST` reports them as guaranteed.
+Automatic generation-policy injection uses native prompt hooks where the host
+can actually inject model context: Claude Code, Gemini CLI, and Qwen Code.
+Cursor's prompt hook is used only for enforceable ingress blocking, and Copilot
+CLI command prompt-hook output is not treated as injectable. Use
+`acco client-capabilities --client HOST` for the exact guarantee level of each
+runtime surface.
 
 Automatic model routing is opt-in. When enabled, ACCO classifies the task,
 derives a complexity/risk capability floor, then chooses the cheapest eligible

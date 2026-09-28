@@ -12,7 +12,7 @@ acco start [path] [--agent NAME] [--remember] [--no-index]
 ## Arguments and options
 
 - `path` — project root; defaults to `.`.
-- `--agent` — explicitly select `claude`, `codex`, `gemini`, `cursor`,
+- `--agent` — explicitly select `claude`, `codex`, `gemini`, `qwen`, `cursor`,
   `opencode`, `openclaw`, `hermes`, `copilot`, or `antigravity`.
 - `--remember` — persist an explicit agent choice in private ACCO user state.
 - `--no-index` — skip the normal structural-index warm-up.
