@@ -53,6 +53,9 @@ TOOL_GROUPS = {
     "routing": (
         "route_task",
     ),
+    "execution": (
+        "execute",
+    ),
 }
 
 _GROUP_TERMS = {
@@ -81,6 +84,11 @@ _GROUP_TERMS = {
     "routing": {
         "model", "route", "routing", "cost", "price", "pricing", "haiku",
         "sonnet", "opus",
+    },
+    "execution": {
+        "analyze", "analysis", "aggregate", "batch", "count", "csv", "data",
+        "execute", "execution", "json", "logs", "many", "statistics", "summarize",
+        "scan",
     },
 }
 
