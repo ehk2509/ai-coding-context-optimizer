@@ -1,5 +1,52 @@
 # Unreleased
 
+# 1.23.0 - 2026-09-28
+
+- **Added first-class out-of-context programmable execution.** ACCO can run a
+  restricted Python analysis program over explicit repository-contained text
+  files in a separate local process and return only the JSON result, keeping
+  bulk logs/JSON/reports out of model context. The surface is shared by MCP
+  `execute`, `AccoEngine.execute(...)`, the loopback `/v1/execute` bridge,
+  the TypeScript client, and frozen standalone executables.
+- **Kept programmable execution bounded and recoverable.** Imports, arbitrary
+  file access, shell/process APIs, dynamic evaluation/introspection, private
+  attribute traversal, path escapes, binary inputs, and unbounded execution are
+  rejected or capped. Large computed results reuse ACCO's existing exact
+  `tsr_...` recovery store. The boundary is documented as defense in depth,
+  not a hardened hostile-code VM/container sandbox.
+- **Added native hook interception for Cursor, Gemini CLI, Qwen Code, Copilot
+  CLI, and Codex.** All adapters normalize host events into the existing
+  host-neutral `HookRuntime` instead of duplicating compression, read-guard,
+  ingress, continuity, routing, or telemetry policy. Setup/uninstall mutations
+  preserve unrelated host configuration.
+- **Added result replacement where the host genuinely supports it.** Gemini and
+  Copilot can replace/hide successful tool results directly. Trusted Codex
+  project hooks can suppress normal handling of large local Bash/MCP results
+  and deliver ACCO's compact recoverable context. Cursor/Qwen capability
+  reporting stays conservative where general successful-result rewriting is
+  not available.
+- **Made Codex lifecycle integration trust-aware.** `acco setup --host codex`
+  now manages both the existing MCP block and project `.codex/hooks.json`
+  lifecycle hooks, keeps repeated setup byte-stable, preserves unrelated hook
+  groups, refuses mixed inline/hooks.json representations, and does not mark
+  executable project hooks trusted on the user's behalf.
+- **Added prompt-derived multi-path task coverage.** The generation policy now
+  receives a deterministic checklist when a task explicitly names multiple
+  APIs/paths/reproductions, reducing the risk that focused verification fixes
+  only the first reported path and stops.
+- **Recorded the 144-run paired SWE-bench development study without promoting it
+  into a release claim.** On 24 tasks × 3 trials per arm, ACCO measured 55/72
+  solved versus 56/72 for plain Claude Code, with 25.6% fewer total tokens,
+  20.3% fewer model calls, and 21.1% lower equivalent cost per solved task.
+  Because the suite was adapted rather than frozen and success was one run
+  lower, the result remains non-publishable development evidence.
+- **Release-gated the combined architecture cross-platform.** The new execution
+  and native-hook paths passed the same 19-job CI matrix covering Python
+  3.10/3.12/3.13, native Windows, TypeScript, Rust/HNSW parity, frozen retrieval
+  holdout, ranking regression, real CLI-output corpora, and standalone
+  Linux/macOS/Windows x86_64 and ARM64 builds.
+
+
 # 1.22.1 - 2026-09-28
 
 - **Migrated project hosting identity to `ehk2509`.** Repository URLs, Claude
