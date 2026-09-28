@@ -14,7 +14,7 @@ from typing import Any
 from .config import update_json
 
 ACCO_HOOK_PREFIX = "acco hook --host "
-NATIVE_HOOK_HOSTS = ("cursor", "gemini", "qwen", "copilot")
+NATIVE_HOOK_HOSTS = ("cursor", "gemini", "qwen", "copilot", "codex")
 
 
 def hook_command(host: str, event: str) -> str:
@@ -42,6 +42,16 @@ def qwen_settings_path(root: Path) -> Path:
 def copilot_hooks_path(root: Path) -> Path:
     """Return ACCO's owned Copilot repository-hook file."""
     return root.resolve() / ".github" / "hooks" / "acco.json"
+
+
+def codex_hooks_path(root: Path) -> Path:
+    """Return Codex's project lifecycle-hook configuration path."""
+    return root.resolve() / ".codex" / "hooks.json"
+
+
+def codex_project_config_path(root: Path) -> Path:
+    """Return Codex's project TOML path used to detect mixed hook formats."""
+    return root.resolve() / ".codex" / "config.toml"
 
 
 def _is_acco_command(value: object, host: str) -> bool:
@@ -95,19 +105,34 @@ def _nested_entries(host: str) -> dict[str, list[dict[str, Any]]]:
             "Stop": (None,),
             "StopFailure": (None,),
         }
+    elif host == "codex":
+        specs = {
+            "PreToolUse": ("^Bash$",),
+            "PostToolUse": ("^(Bash|mcp__.*)$",),
+            "UserPromptSubmit": (None,),
+            "SessionStart": ("startup|resume|clear|compact",),
+            "PreCompact": ("manual|auto",),
+            "Stop": (None,),
+        }
     else:
         raise ValueError(host)
 
     result: dict[str, list[dict[str, Any]]] = {}
     for event, (matcher,) in specs.items():
-        inner = {
+        inner: dict[str, Any] = {
             "type": "command",
             "command": hook_command(host, event),
-            "name": f"acco-{event}",
             # Gemini CLI expresses command-hook timeout in milliseconds;
-            # Qwen Code expresses it in seconds.
+            # Qwen/Codex command hooks express it in seconds.
             "timeout": 10_000 if host == "gemini" else 10,
         }
+        if host != "codex":
+            inner["name"] = f"acco-{event}"
+        else:
+            inner["commandWindows"] = hook_command(host, event)
+            inner["statusMessage"] = f"ACCO {event}"
+            if event in {"PostToolUse", "UserPromptSubmit", "SessionStart"}:
+                inner["additionalContextLimit"] = 2500
         outer: dict[str, Any] = {"hooks": [inner]}
         if matcher is not None:
             outer["matcher"] = matcher
@@ -171,7 +196,7 @@ def uninstall_cursor_hooks(root: Path) -> None:
 
 
 def _remove_nested_owned(payload: dict, host: str) -> dict:
-    """Remove ACCO-owned Gemini/Qwen nested command hooks."""
+    """Remove ACCO-owned Gemini/Qwen/Codex nested command hooks."""
     updated = dict(payload)
     hooks = updated.get("hooks")
     if not isinstance(hooks, dict):
@@ -212,7 +237,7 @@ def _remove_nested_owned(payload: dict, host: str) -> dict:
 
 
 def _install_nested(root: Path, host: str, path: Path) -> None:
-    """Install nested command hooks used by Gemini CLI or Qwen Code."""
+    """Install nested command hooks used by Gemini CLI, Qwen Code, or Codex."""
     wanted = _nested_entries(host)
     path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -252,6 +277,42 @@ def uninstall_qwen_hooks(root: Path) -> None:
     path = qwen_settings_path(root)
     if path.exists():
         update_json(path, lambda current: _remove_nested_owned(current, "qwen"))
+
+
+def validate_codex_hooks_manageable(root: Path) -> None:
+    """Avoid creating hooks.json beside an existing inline Codex hook layer."""
+    hooks_path = codex_hooks_path(root)
+    config_path = codex_project_config_path(root)
+    if hooks_path.exists() or not config_path.exists():
+        return
+    try:
+        lines = config_path.read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        raise ValueError(f"Unable to inspect Codex project config: {config_path}") from exc
+    if any(
+        line.strip().startswith("[hooks")
+        or line.strip().startswith("[[hooks")
+        for line in lines
+        if not line.lstrip().startswith("#")
+    ):
+        raise ValueError(
+            "Refusing to add .codex/hooks.json because project config.toml "
+            "already defines inline Codex hooks; use one hook representation "
+            "per project layer."
+        )
+
+
+def install_codex_hooks(root: Path) -> None:
+    """Install Codex project hooks without replacing unrelated hook groups."""
+    validate_codex_hooks_manageable(root)
+    _install_nested(root, "codex", codex_hooks_path(root))
+
+
+def uninstall_codex_hooks(root: Path) -> None:
+    """Remove only ACCO hook commands from Codex's shared hooks.json."""
+    path = codex_hooks_path(root)
+    if path.exists():
+        update_json(path, lambda current: _remove_nested_owned(current, "codex"))
 
 
 def _copilot_payload() -> dict:
@@ -343,8 +404,14 @@ def native_hooks_configured(root: Path, host: str) -> bool:
             for item in entries
             if (command := item.get("command"))
         }
-    elif host in {"gemini", "qwen"}:
-        path = gemini_settings_path(root) if host == "gemini" else qwen_settings_path(root)
+    elif host in {"gemini", "qwen", "codex"}:
+        path = (
+            gemini_settings_path(root)
+            if host == "gemini"
+            else qwen_settings_path(root)
+            if host == "qwen"
+            else codex_hooks_path(root)
+        )
         wanted = {
             inner["command"]
             for groups in _nested_entries(host).values()
