@@ -347,3 +347,37 @@ test("context budget planner is exposed through the typed client", async () => {
     assert.equal(plan.allocations.tool_results, 1800);
   });
 });
+
+
+test("typed client exposes out-of-context execution", async () => {
+  await withServer(async (req, res) => {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    assert.equal(req.url, "/v1/execute");
+    assert.deepEqual(body.files, ["events.log"]);
+    assert.match(body.code, /result/);
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({
+      schema: 1,
+      language: "restricted-python",
+      files: body.files,
+      input_bytes: 10000,
+      result_bytes: 24,
+      elapsed_ms: 5,
+      timeout_seconds: 5,
+      out_of_context: true,
+      truncated: false,
+      result: { errors: 12 },
+      recovery_handle: null,
+    }));
+  }, async (baseUrl) => {
+    const client = new AccoClient({ baseUrl });
+    const result = await client.execute(
+      'result = {"errors": len(data["events.log"].splitlines())}',
+      ["events.log"],
+    );
+    assert.equal(result.out_of_context, true);
+    assert.equal(result.result.errors, 12);
+  });
+});
