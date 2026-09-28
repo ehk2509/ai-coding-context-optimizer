@@ -57,8 +57,8 @@ def test_native_hook_hosts_report_only_documented_replacement_strength():
     assert capabilities_for("cursor").level("post_tool_replace") == "conditional"
     assert capabilities_for("copilot").guaranteed("post_tool_replace")
     assert capabilities_for("gemini").guaranteed("post_tool_replace")
-    assert capabilities_for("qwen").level("post_tool_replace") == "conditional"
-    assert capabilities_for("qwen").guaranteed("prompt_ingress")
+    assert capabilities_for("qwen").level("post_tool_replace") == "no"
+    assert capabilities_for("qwen").level("prompt_ingress") == "conditional"
 
 
 def test_extended_host_aliases_normalize_to_registry_entries():
