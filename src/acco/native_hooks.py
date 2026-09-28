@@ -224,11 +224,15 @@ def normalize_payload(host: str, event: str, payload: dict) -> dict:
             normalized["tool_response"] = _canonical_tool_response(host, payload)
 
     if canonical_event == "UserPromptSubmit":
-        normalized["prompt"] = str(
+        prompt = (
             payload.get("submitted_prompt")
-            or payload.get("prompt")
-            or ""
+            if host == "qwen"
+            else (
+                payload.get("submitted_prompt")
+                or payload.get("prompt")
+            )
         )
+        normalized["prompt"] = str(prompt or "")
         if payload.get("model"):
             normalized["model"] = payload["model"]
 
