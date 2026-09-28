@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -eu
 
-REPO="elyeshkiri/ai-coding-context-optimizer"
+REPO="ehk2509/ai-coding-context-optimizer"
 INSTALL_DIR="${ACCO_INSTALL_DIR:-$HOME/.local/bin}"
 VERSION="${ACCO_VERSION:-latest}"
 
