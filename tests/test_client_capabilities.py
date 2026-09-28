@@ -43,12 +43,22 @@ def test_capability_report_contains_feature_prerequisites():
 
 
 def test_extended_hosts_expose_mcp_without_inventing_hook_guarantees():
-    """New hosts should be usable through MCP while remaining conservative elsewhere."""
-    for name in ("opencode", "openclaw", "hermes", "copilot", "antigravity"):
+    """MCP-only hosts should remain conservative about lifecycle interception."""
+    for name in ("opencode", "openclaw", "hermes", "antigravity"):
         caps = capabilities_for(name)
         assert caps.guaranteed("mcp")
         assert caps.level("pre_tool_intercept") == "unknown"
         assert caps.level("model_route_execution") == "advisory"
+
+
+def test_native_hook_hosts_report_only_documented_replacement_strength():
+    """Native adapters should distinguish full result rewrite from partial hooks."""
+    assert capabilities_for("cursor").guaranteed("pre_tool_intercept")
+    assert capabilities_for("cursor").level("post_tool_replace") == "conditional"
+    assert capabilities_for("copilot").guaranteed("post_tool_replace")
+    assert capabilities_for("gemini").guaranteed("post_tool_replace")
+    assert capabilities_for("qwen").level("post_tool_replace") == "conditional"
+    assert capabilities_for("qwen").guaranteed("prompt_ingress")
 
 
 def test_extended_host_aliases_normalize_to_registry_entries():
@@ -58,3 +68,4 @@ def test_extended_host_aliases_normalize_to_registry_entries():
     assert capabilities_for("Hermes-Agent").client == "hermes"
     assert capabilities_for("GitHub-Copilot").client == "copilot"
     assert capabilities_for("Google-Antigravity").client == "antigravity"
+    assert capabilities_for("Qwen").client == "qwen-code"
