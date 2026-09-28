@@ -80,7 +80,7 @@ def _nested_entries(host: str) -> dict[str, list[dict[str, Any]]]:
     if host == "gemini":
         specs = {
             "BeforeTool": ("^(read_file|run_shell_command)$",),
-            "AfterTool": ("^run_shell_command$",),
+            "AfterTool": ("*",),
             "BeforeAgent": (None,),
             "SessionStart": ("*",),
             "PreCompress": ("*",),
@@ -266,7 +266,7 @@ def _copilot_payload() -> dict:
         "version": 1,
         "hooks": {
             "PreToolUse": [command("PreToolUse", "Bash|Read")],
-            "PostToolUse": [command("PostToolUse", "Bash")],
+            "PostToolUse": [command("PostToolUse")],
             "SessionStart": [command("SessionStart")],
             "PreCompact": [command("PreCompact")],
             "Stop": [command("Stop")],
