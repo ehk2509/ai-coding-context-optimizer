@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
+import sys
 
 import pytest
 
 from acco.execution import (
     ExecutionLimits,
     ExecutionValidationError,
+    _worker_command,
     execute_program,
 )
 from acco.recovery import RecoveryStore
@@ -20,6 +22,23 @@ def _repo(tmp_path, monkeypatch):
     root = tmp_path / "repo"
     root.mkdir()
     return root
+
+
+def test_worker_command_reenters_frozen_standalone(monkeypatch):
+    """Frozen builds must spawn ACCO's private worker instead of treating ACCO as Python."""
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+
+    assert _worker_command() == [sys.executable, "__acco-execution-worker"]
+
+
+def test_worker_command_uses_isolated_python_for_normal_install(monkeypatch):
+    """Python installs should retain isolated startup for the analysis child."""
+    monkeypatch.delattr(sys, "frozen", raising=False)
+
+    command = _worker_command()
+
+    assert command[:3] == [sys.executable, "-I", "-S"]
+    assert command[3] == "-c"
 
 
 def test_execute_aggregates_large_local_input_without_returning_source(
