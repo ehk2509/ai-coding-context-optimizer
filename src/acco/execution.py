@@ -150,7 +150,7 @@ class ExecutionLimits:
     max_input_bytes: int = MAX_INPUT_BYTES
     max_code_chars: int = MAX_CODE_CHARS
 
-    def validate(self) -> "ExecutionLimits":
+    def validate(self) -> ExecutionLimits:
         """Validate limits and return the normalized immutable value."""
         if not 1 <= int(self.timeout_seconds) <= MAX_TIMEOUT_SECONDS:
             raise ValueError(
