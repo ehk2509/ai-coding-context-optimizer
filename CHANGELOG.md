@@ -78,7 +78,7 @@
   process exit; Linux/macOS replace atomically in place.
 - **Preserved native package-manager ownership.** Frozen binaries installed by
   Homebrew or WinGet route `acco update` back through `brew upgrade acco` or
-  `winget upgrade --id ElyesHkiri.ACCO` instead of mutating package-managed
+  `winget upgrade --id ehk2509.ACCO` instead of mutating package-managed
   files directly.
 - **Expanded standalone releases to six native targets.** Release and PR smoke
   matrices now cover Linux x86_64/ARM64, macOS ARM64/Intel, and Windows
@@ -91,7 +91,7 @@
 - **Prepared package-manager-native distribution.** Releases now generate an
   architecture-complete Homebrew formula and WinGet 1.12 multi-file manifests
   from the actual release checksums. A secret-gated publisher workflow can
-  create/update `elyeshkiri/homebrew-acco` and submit WinGet manifests;
+  create/update `ehk2509/homebrew-acco` and submit WinGet manifests;
   absent publisher credentials, those external steps visibly no-op rather than
   claiming publication.
 
