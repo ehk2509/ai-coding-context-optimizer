@@ -687,6 +687,7 @@ def setup_integrations(
             lean_skill = _ensure_managed_lean_skill(root)
         changed.append("claude")
     if "cursor" in requested:
+        cursor_mcp_path(root).parent.mkdir(parents=True, exist_ok=True)
         update_json(cursor_mcp_path(root), _merge_mcp(root))
         install_cursor_hooks(root)
         changed.append("cursor")
