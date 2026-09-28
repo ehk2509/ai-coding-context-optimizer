@@ -104,7 +104,9 @@ def _nested_entries(host: str) -> dict[str, list[dict[str, Any]]]:
             "type": "command",
             "command": hook_command(host, event),
             "name": f"acco-{event}",
-            "timeout": 10,
+            # Gemini CLI expresses command-hook timeout in milliseconds;
+            # Qwen Code expresses it in seconds.
+            "timeout": 10_000 if host == "gemini" else 10,
         }
         outer: dict[str, Any] = {"hooks": [inner]}
         if matcher is not None:
