@@ -166,85 +166,6 @@ def _text(value: object) -> str:
 
 def _canonical_tool_response(host: str, payload: dict) -> dict:
     """Translate one supported successful tool response to HookRuntime shape."""
-    if host == "codex":
-        if event == "PreToolUse":
-            specific = _specific(response)
-            if not specific:
-                return {}
-            allowed = {
-                key: value
-                for key, value in specific.items()
-                if key in {
-                    "permissionDecision",
-                    "permissionDecisionReason",
-                    "additionalContext",
-                    "updatedInput",
-                }
-            }
-            if not allowed:
-                return {}
-            allowed["hookEventName"] = "PreToolUse"
-            return {"hookSpecificOutput": allowed}
-        if event == "PostToolUse":
-            result: dict[str, Any] = {}
-            stdout = _updated_stdout(response)
-            context = _additional_context(response)
-            if stdout is not None:
-                # Codex documents continue:false as the non-rejecting way to
-                # suppress normal processing of the original tool result. The
-                # compact replacement is delivered as hook additional context.
-                result["continue"] = False
-                result["stopReason"] = (
-                    "ACCO replaced the original tool result with compact "
-                    "recoverable context."
-                )
-                result["hookSpecificOutput"] = {
-                    "hookEventName": "PostToolUse",
-                    "additionalContext": stdout,
-                }
-            elif context:
-                result["hookSpecificOutput"] = {
-                    "hookEventName": "PostToolUse",
-                    "additionalContext": context,
-                }
-            return result
-        if event == "UserPromptSubmit":
-            reason = _blocked_prompt_reason(response)
-            if reason:
-                return {"decision": "block", "reason": reason}
-            result = {}
-            context = _additional_context(response)
-            if context:
-                result["hookSpecificOutput"] = {
-                    "hookEventName": "UserPromptSubmit",
-                    "additionalContext": context,
-                }
-            system = response.get("systemMessage") if isinstance(response, dict) else None
-            if isinstance(system, str) and system:
-                result["systemMessage"] = system
-            return result
-        if event == "SessionStart":
-            context = _additional_context(response)
-            result = {}
-            if context:
-                result["hookSpecificOutput"] = {
-                    "hookEventName": "SessionStart",
-                    "additionalContext": context,
-                }
-            system = response.get("systemMessage") if isinstance(response, dict) else None
-            if isinstance(system, str) and system:
-                result["systemMessage"] = system
-            return result
-        if event in {"PreCompact", "Stop"}:
-            if not isinstance(response, dict):
-                return {}
-            return {
-                key: response[key]
-                for key in ("continue", "stopReason", "systemMessage")
-                if key in response
-            }
-        return {}
-
     if host == "copilot":
         raw = payload.get("tool_result") or payload.get("toolResult") or {}
         stdout = _text(raw)
@@ -408,6 +329,86 @@ def adapt_response(host: str, event: str, response: dict | None) -> dict:
     """Translate HookRuntime output into one host's documented response schema."""
     host = host.strip().lower()
     if response is None:
+        return {}
+
+    if host == "codex":
+        if event == "PreToolUse":
+            specific = _specific(response)
+            if not specific:
+                return {}
+            allowed = {
+                key: value
+                for key, value in specific.items()
+                if key in {
+                    "permissionDecision",
+                    "permissionDecisionReason",
+                    "additionalContext",
+                    "updatedInput",
+                }
+            }
+            if not allowed:
+                return {}
+            allowed["hookEventName"] = "PreToolUse"
+            return {"hookSpecificOutput": allowed}
+        if event == "PostToolUse":
+            result: dict[str, Any] = {}
+            stdout = _updated_stdout(response)
+            context = _additional_context(response)
+            if stdout is not None:
+                # Codex documents continue:false as the non-rejecting way to
+                # suppress normal processing of the original tool result. ACCO
+                # delivers its compact exact-recovery representation as
+                # additional developer context.
+                result["continue"] = False
+                result["stopReason"] = (
+                    "ACCO replaced the original tool result with compact "
+                    "recoverable context."
+                )
+                result["hookSpecificOutput"] = {
+                    "hookEventName": "PostToolUse",
+                    "additionalContext": stdout,
+                }
+            elif context:
+                result["hookSpecificOutput"] = {
+                    "hookEventName": "PostToolUse",
+                    "additionalContext": context,
+                }
+            return result
+        if event == "UserPromptSubmit":
+            reason = _blocked_prompt_reason(response)
+            if reason:
+                return {"decision": "block", "reason": reason}
+            result = {}
+            context = _additional_context(response)
+            if context:
+                result["hookSpecificOutput"] = {
+                    "hookEventName": "UserPromptSubmit",
+                    "additionalContext": context,
+                }
+            system = response.get("systemMessage") if isinstance(response, dict) else None
+            if isinstance(system, str) and system:
+                result["systemMessage"] = system
+            return result
+        if event == "SessionStart":
+            context = _additional_context(response)
+            result = {}
+            if context:
+                result["hookSpecificOutput"] = {
+                    "hookEventName": "SessionStart",
+                    "additionalContext": context,
+                }
+            system = response.get("systemMessage") if isinstance(response, dict) else None
+            if isinstance(system, str) and system:
+                result["systemMessage"] = system
+            return result
+        if event in {"PreCompact", "Stop"}:
+            if not isinstance(response, dict):
+                return {}
+            return {
+                key: response[key]
+                for key in ("continue", "stopReason", "systemMessage")
+                if key in response
+            }
         return {}
 
     if host == "copilot":
