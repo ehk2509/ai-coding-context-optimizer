@@ -199,7 +199,7 @@ def main(argv: list[str] | None = None) -> int:
         default="claude",
     )
     parser.add_argument("--event")
-    args = parser.parse_args(argv)
+    args = parser.parse_args([] if argv is None else argv)
     if args.host != "claude":
         if not args.event:
             parser.error("--event is required when --host is not claude")
@@ -226,4 +226,4 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(main(sys.argv[1:]))
