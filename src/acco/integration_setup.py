@@ -642,7 +642,6 @@ def setup_integrations(
     if "cursor" in requested:
         _validate_json_object(cursor_mcp_path(root))
         _validate_json_object(cursor_hooks_path(root))
-        _validate_json_object(cursor_hooks_path(root))
     if "codex" in requested:
         _validate_codex_manageable(codex_config_path(home))
     if "opencode" in requested:
@@ -760,15 +759,16 @@ def uninstall_integrations(
         _validate_json_object(claude_settings_path(root))
         _validate_json_object(claude_mcp_path(root))
     if "cursor" in requested:
-        _validate_json_object(cursor_mcp_path(root))
+        _validate_json_object(cursor_mcp_path(root))\n        _validate_json_object(cursor_hooks_path(root))
     if "opencode" in requested:
         _validate_json_object(opencode_mcp_path(root))
     if "copilot" in requested:
         if copilot_vscode_configured(root):
             _validate_json_object(copilot_mcp_path(root))
+        if copilot_hooks_path(root).exists():
+            validate_copilot_hooks_manageable(root)
         if copilot_cli_configured(home):
             validate_copilot_cli_manageable(home)
-            validate_copilot_hooks_manageable(root)
             if not which(HOST_EXECUTABLES["copilot"]):
                 raise ValueError(
                     "Copilot CLI uninstall requires the copilot executable "
@@ -820,7 +820,7 @@ def uninstall_integrations(
         uninstall_hermes(home)
         removed.append("hermes")
     if "copilot" in requested:
-        if native_hooks_configured(root, "copilot"):
+        if copilot_hooks_path(root).exists():
             uninstall_copilot_hooks(root)
         if copilot_cli_configured(home):
             uninstall_copilot_cli(home=home, runner=runner)
