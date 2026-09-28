@@ -82,7 +82,7 @@ For machine-readable fields, see [Machine-readable CLI contracts](JSON_OUTPUTS.m
 - [`corpus-analyze`](commands/corpus-analyze.md) — mine real transcripts for highest-token generic processor gaps.
 - [`output`](commands/output.md) — page a saved original command result.
 - [`outputs-prune`](commands/outputs-prune.md) — prune old saved outputs.
-- [`hook`](commands/hook.md) — Claude/Cursor/Gemini/Qwen/Copilot hook stdin/stdout adapter.
+- [`hook`](commands/hook.md) — Claude/Codex/Cursor/Gemini/Qwen/Copilot hook stdin/stdout adapter.
 - [`recover`](commands/recover.md) — recover exact bytes from a `tsr_...` handle.
 - [`recovery-status`](commands/recovery-status.md) — inspect exact-recovery capacity.
 - [`browser-context`](commands/browser-context.md) — focus captured HTML/AX-like context with exact recovery.
