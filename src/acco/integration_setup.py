@@ -642,6 +642,7 @@ def setup_integrations(
     if "cursor" in requested:
         _validate_json_object(cursor_mcp_path(root))
         _validate_json_object(cursor_hooks_path(root))
+        _validate_json_object(cursor_hooks_path(root))
     if "codex" in requested:
         _validate_codex_manageable(codex_config_path(home))
     if "opencode" in requested:
@@ -767,6 +768,7 @@ def uninstall_integrations(
             _validate_json_object(copilot_mcp_path(root))
         if copilot_cli_configured(home):
             validate_copilot_cli_manageable(home)
+            validate_copilot_hooks_manageable(root)
             if not which(HOST_EXECUTABLES["copilot"]):
                 raise ValueError(
                     "Copilot CLI uninstall requires the copilot executable "
@@ -774,6 +776,10 @@ def uninstall_integrations(
                 )
     if "antigravity" in requested:
         _validate_json_object(antigravity_mcp_path(root))
+    if "gemini" in requested:
+        _validate_json_object(gemini_settings_path(root))
+    if "qwen" in requested:
+        _validate_json_object(qwen_settings_path(root))
     if "hermes" in requested:
         validate_hermes_manageable(hermes_config_path(home))
     if (
@@ -799,6 +805,7 @@ def uninstall_integrations(
         path = cursor_mcp_path(root)
         if path.exists():
             update_json(path, _remove_mcp)
+        uninstall_cursor_hooks(root)
         removed.append("cursor")
     if "codex" in requested:
         _uninstall_codex(codex_config_path(home))
@@ -813,6 +820,8 @@ def uninstall_integrations(
         uninstall_hermes(home)
         removed.append("hermes")
     if "copilot" in requested:
+        if native_hooks_configured(root, "copilot"):
+            uninstall_copilot_hooks(root)
         if copilot_cli_configured(home):
             uninstall_copilot_cli(home=home, runner=runner)
         uninstall_copilot_vscode(root)
@@ -820,6 +829,12 @@ def uninstall_integrations(
     if "antigravity" in requested:
         uninstall_antigravity(root)
         removed.append("antigravity")
+    if "gemini" in requested:
+        uninstall_gemini_hooks(root)
+        removed.append("gemini")
+    if "qwen" in requested:
+        uninstall_qwen_hooks(root)
+        removed.append("qwen")
     config = root / CONFIG_NAME
     if remove_config and config.exists():
         config.unlink()
