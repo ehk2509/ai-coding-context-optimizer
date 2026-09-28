@@ -166,3 +166,18 @@ def test_copilot_refuses_to_overwrite_user_owned_same_path(tmp_path):
         install_copilot_hooks(tmp_path)
 
     assert "./user-policy.sh" in path.read_text(encoding="utf-8")
+
+
+def test_gemini_and_qwen_timeout_units_follow_host_contracts(tmp_path):
+    """Gemini uses milliseconds while Qwen command hooks use seconds."""
+    install_gemini_hooks(tmp_path)
+    install_qwen_hooks(tmp_path)
+
+    gemini = json.loads(gemini_settings_path(tmp_path).read_text(encoding="utf-8"))
+    qwen = json.loads(qwen_settings_path(tmp_path).read_text(encoding="utf-8"))
+
+    gemini_timeout = gemini["hooks"]["BeforeTool"][0]["hooks"][0]["timeout"]
+    qwen_timeout = qwen["hooks"]["PreToolUse"][0]["hooks"][0]["timeout"]
+
+    assert gemini_timeout == 10_000
+    assert qwen_timeout == 10
