@@ -37,6 +37,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if not args:
         return home_main([])
+    if args[0] == "__acco-execution-worker":
+        from .execution import execution_worker_main
+
+        return execution_worker_main()
     if args[0] == "proxy-run":
         return proxy_run_main(args[1:])
     return DEFAULT_COMMAND_REGISTRY.dispatch(args, legacy_main)
