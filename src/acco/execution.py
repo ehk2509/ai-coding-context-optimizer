@@ -73,7 +73,7 @@ import re
 import statistics
 import sys
 
-payload = json.loads(sys.stdin.read())
+payload = json.loads(sys.stdin.buffer.read().decode("utf-8"))
 data = payload["data"]
 
 safe_builtins = {
@@ -132,7 +132,7 @@ except BaseException as exc:
         separators=(",", ":"),
     )
 
-sys.stdout.write(encoded)
+sys.stdout.buffer.write(encoded.encode("utf-8"))
 """
 
 
@@ -357,11 +357,8 @@ def execute_program(
     try:
         process = subprocess.run(
             [sys.executable, "-I", "-S", "-c", _RUNNER],
-            input=payload,
+            input=payload.encode("utf-8"),
             capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
             timeout=normalized_limits.timeout_seconds,
             cwd=str(repository),
             env=_subprocess_environment(),
@@ -373,13 +370,13 @@ def execute_program(
         ) from exc
     elapsed_ms = int((time.monotonic() - started) * 1000)
     if process.returncode != 0:
-        detail = (process.stderr or "").strip()[-1000:]
+        detail = (process.stderr or b"").decode("utf-8", errors="replace").strip()[-1000:]
         raise RuntimeError(
             "ACCO execution subprocess failed"
             + (f": {detail}" if detail else "")
         )
     try:
-        response = json.loads(process.stdout)
+        response = json.loads(process.stdout.decode("utf-8"))
     except ValueError as exc:
         raise RuntimeError("ACCO execution returned invalid runner output") from exc
     if not isinstance(response, dict) or not response.get("ok"):
