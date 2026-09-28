@@ -457,6 +457,9 @@ def detect_hosts(
     }
     claude_paths = (claude_settings_path(root), claude_mcp_path(root))
     cursor_path = cursor_mcp_path(root)
+    cursor_native_path = cursor_hooks_path(root)
+    gemini_path = gemini_settings_path(root)
+    qwen_path = qwen_settings_path(root)
     codex_path = codex_config_path(home)
     codex_text = codex_path.read_text(encoding="utf-8") if codex_path.exists() else ""
     opencode_path = opencode_mcp_path(root)
@@ -490,10 +493,11 @@ def detect_hosts(
                 or (home / ".cursor").exists()
                 or (root / ".cursor").exists()
             ),
-            _json_mcp_configured(cursor_path),
+            _json_mcp_configured(cursor_path)
+            and native_hooks_configured(root, "cursor"),
             executable["cursor"],
-            (str(cursor_path),),
-            ("mcp",),
+            (str(cursor_path), str(cursor_native_path)),
+            ("mcp", "native-hooks"),
         ),
         HostStatus(
             "codex",
@@ -539,12 +543,20 @@ def detect_hosts(
                 home=home,
                 cli_required=copilot_cli_surface,
                 vscode_required=copilot_vscode_surface,
+            )
+            and (
+                not copilot_cli_surface
+                or native_hooks_configured(root, "copilot")
             ),
             copilot_executable,
-            (str(copilot_cli_path), str(copilot_path)),
+            (
+                str(copilot_cli_path),
+                str(copilot_path),
+                str(copilot_hooks_path(root)),
+            ),
             tuple(
                 ["mcp"]
-                + (["copilot-cli"] if copilot_cli_surface else [])
+                + (["copilot-cli", "native-hooks"] if copilot_cli_surface else [])
                 + (["vscode-workspace"] if copilot_vscode_surface else [])
             ),
         ),
@@ -559,6 +571,30 @@ def detect_hosts(
             executable["antigravity"],
             (str(antigravity_path), str(antigravity_global)),
             ("mcp", "workspace-local"),
+        ),
+        HostStatus(
+            "gemini",
+            bool(
+                executable["gemini"]
+                or (root / ".gemini").exists()
+                or (home / ".gemini").exists()
+            ),
+            native_hooks_configured(root, "gemini"),
+            executable["gemini"],
+            (str(gemini_path),),
+            ("native-hooks", "project-local"),
+        ),
+        HostStatus(
+            "qwen",
+            bool(
+                executable["qwen"]
+                or (root / ".qwen").exists()
+                or (home / ".qwen").exists()
+            ),
+            native_hooks_configured(root, "qwen"),
+            executable["qwen"],
+            (str(qwen_path),),
+            ("native-hooks", "project-local"),
         ),
     ]
 
