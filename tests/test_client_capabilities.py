@@ -30,8 +30,8 @@ def test_feature_support_distinguishes_guarantee_from_fallback():
     assert adaptive["available_with_fallback"] is True
 
     ingress = feature_support("cursor", "prompt-ingress")
-    assert ingress["guaranteed"] is False
-    assert ingress["available_with_fallback"] is False
+    assert ingress["guaranteed"] is True
+    assert ingress["available_with_fallback"] is True
 
 
 def test_capability_report_contains_feature_prerequisites():
