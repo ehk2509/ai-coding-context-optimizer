@@ -48,7 +48,7 @@ they avoid project-environment and PATH confusion.
 Claude Code 2.1.229+ can install ACCO's generated plugin directly:
 
 ```text
-/plugin marketplace add elyeshkiri/ai-coding-context-optimizer
+/plugin marketplace add ehk2509/ai-coding-context-optimizer
 /plugin install acco@acco-tools
 ```
 
@@ -78,7 +78,7 @@ Linux/macOS users can use the repository installer after a release containing
 standalone assets:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/elyeshkiri/ai-coding-context-optimizer/main/scripts/install-standalone.sh | sh
+curl -fsSL https://raw.githubusercontent.com/ehk2509/ai-coding-context-optimizer/main/scripts/install-standalone.sh | sh
 ```
 
 This path is optional. Review the script first if your environment does not
@@ -90,7 +90,7 @@ Windows x86_64 and ARM64 have native standalone installations that do not
 require Python:
 
 ```powershell
-irm https://raw.githubusercontent.com/elyeshkiri/ai-coding-context-optimizer/main/scripts/install-standalone.ps1 | iex
+irm https://raw.githubusercontent.com/ehk2509/ai-coding-context-optimizer/main/scripts/install-standalone.ps1 | iex
 ```
 
 The PowerShell installer:
@@ -130,15 +130,15 @@ Linux/macOS x86_64 and ARM64 checksums. The release formula works directly:
 
 ```bash
 brew install --formula \
-  https://github.com/elyeshkiri/ai-coding-context-optimizer/releases/latest/download/acco.rb
+  https://github.com/ehk2509/ai-coding-context-optimizer/releases/latest/download/acco.rb
 ```
 
 The repository also contains a secret-gated publisher that can create/update
-`elyeshkiri/homebrew-acco`. Once that external tap has actually been
+`ehk2509/homebrew-acco`. Once that external tap has actually been
 published, the normal flow is:
 
 ```bash
-brew tap elyeshkiri/acco
+brew tap ehk2509/acco
 brew install acco
 ```
 
@@ -152,7 +152,7 @@ acceptance into the public WinGet community repository; only after that
 upstream PR is accepted should users expect:
 
 ```powershell
-winget install --id ElyesHkiri.ACCO
+winget install --id ehk2509.ACCO
 ```
 
 See [Native release signing and package publication](RELEASE_SIGNING.md).

@@ -1,4 +1,4 @@
-# ACCO — AI Coding Context Optimizer 1.22.0
+# ACCO — AI Coding Context Optimizer 1.22.1
 
 **ACCO (AI Coding Context Optimizer)** is a local context-optimization layer for AI coding agents. It reduces unnecessary source, tool-output, and always-on context while preserving exact code where the model needs it.
 
@@ -38,7 +38,7 @@ available without crowding onboarding.
 The repository also exposes a Claude-only marketplace:
 
 ```text
-/plugin marketplace add elyeshkiri/ai-coding-context-optimizer
+/plugin marketplace add ehk2509/ai-coding-context-optimizer
 /plugin install acco@acco-tools
 ```
 

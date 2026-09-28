@@ -394,7 +394,7 @@ jobs:
                   "release-checksums/acco-windows-arm64.exe.sha256"
               ).read_text().split()[0].upper(),
           }
-          output = Path("winget") / "ElyesHkiri" / "ACCO" / version
+          output = Path("winget") / "ehk2509" / "ACCO" / version
           output.mkdir(parents=True)
           for template in Path("packaging/winget").glob("*.template"):
               text = template.read_text(encoding="utf-8")

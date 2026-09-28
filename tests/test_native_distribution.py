@@ -26,16 +26,16 @@ def test_homebrew_formula_covers_all_published_unix_architectures():
 def test_winget_templates_cover_x64_and_arm64_portable_binaries():
     """WinGet metadata should expose both native Windows standalone builds."""
     installer = (
-        ROOT / "packaging" / "winget" / "ElyesHkiri.ACCO.installer.yaml.template"
+        ROOT / "packaging" / "winget" / "ehk2509.ACCO.installer.yaml.template"
     ).read_text(encoding="utf-8")
     locale = (
-        ROOT / "packaging" / "winget" / "ElyesHkiri.ACCO.locale.en-US.yaml.template"
+        ROOT / "packaging" / "winget" / "ehk2509.ACCO.locale.en-US.yaml.template"
     ).read_text(encoding="utf-8")
     version = (
-        ROOT / "packaging" / "winget" / "ElyesHkiri.ACCO.yaml.template"
+        ROOT / "packaging" / "winget" / "ehk2509.ACCO.yaml.template"
     ).read_text(encoding="utf-8")
 
-    assert "PackageIdentifier: ElyesHkiri.ACCO" in installer
+    assert "PackageIdentifier: ehk2509.ACCO" in installer
     assert "InstallerType: portable" in installer
     assert "Architecture: x64" in installer
     assert "Architecture: arm64" in installer
@@ -93,7 +93,7 @@ def test_native_package_publisher_is_secret_gated():
 
     assert "HOMEBREW_TAP_TOKEN" in workflow
     assert "WINGET_TOKEN" in workflow
-    assert "gh repo create elyeshkiri/homebrew-acco" in workflow
+    assert "gh repo create ehk2509/homebrew-acco" in workflow
     assert "$wingetCreate submit" in workflow
     assert "skipping external Homebrew tap publication" in workflow
     assert "skipping external WinGet submission" in workflow

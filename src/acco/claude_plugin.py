@@ -25,10 +25,10 @@ _MANIFEST = {
     ),
     "author": {
         "name": "Elyes Hkiri",
-        "url": "https://github.com/elyeshkiri",
+        "url": "https://github.com/ehk2509",
     },
-    "homepage": "https://github.com/elyeshkiri/ai-coding-context-optimizer",
-    "repository": "https://github.com/elyeshkiri/ai-coding-context-optimizer",
+    "homepage": "https://github.com/ehk2509/ai-coding-context-optimizer",
+    "repository": "https://github.com/ehk2509/ai-coding-context-optimizer",
     "license": "MIT",
 }
 

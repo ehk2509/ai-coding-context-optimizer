@@ -28,7 +28,7 @@ On Windows x86_64 or ARM64, the standalone PowerShell installer requires no
 Python and adds ACCO to the user PATH:
 
 ```powershell
-irm https://raw.githubusercontent.com/elyeshkiri/ai-coding-context-optimizer/main/scripts/install-standalone.ps1 | iex
+irm https://raw.githubusercontent.com/ehk2509/ai-coding-context-optimizer/main/scripts/install-standalone.ps1 | iex
 ```
 
 The shell/PowerShell standalone installers also support Linux ARM64 and

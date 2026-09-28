@@ -237,7 +237,7 @@ def main() -> int:
                 "captured_cases": len(cases),
                 "claim_boundary": manifest["protocol"]["claim_boundary"],
             },
-            "elyeshkiri": _evaluate_local(cases),
+            "ehk2509": _evaluate_local(cases),
         }
         if args.ppgranger_path:
             report["ppgranger"] = _evaluate_peer(
@@ -256,7 +256,7 @@ def main() -> int:
     else:
         sys.stdout.write(rendered)
 
-    local = report["elyeshkiri"]["summary"]
+    local = report["ehk2509"]["summary"]
     print(
         "real corpus: "
         f"{local['cases']} cases, "

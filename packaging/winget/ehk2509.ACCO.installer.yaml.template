@@ -1,15 +1,15 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.12.0.schema.json
-PackageIdentifier: ElyesHkiri.ACCO
+PackageIdentifier: ehk2509.ACCO
 PackageVersion: __VERSION__
 InstallerType: portable
 Commands:
 - acco
 Installers:
 - Architecture: x64
-  InstallerUrl: https://github.com/elyeshkiri/ai-coding-context-optimizer/releases/download/v__VERSION__/acco-windows-x86_64.exe
+  InstallerUrl: https://github.com/ehk2509/ai-coding-context-optimizer/releases/download/v__VERSION__/acco-windows-x86_64.exe
   InstallerSha256: __WINDOWS_X86_64_SHA256__
 - Architecture: arm64
-  InstallerUrl: https://github.com/elyeshkiri/ai-coding-context-optimizer/releases/download/v__VERSION__/acco-windows-arm64.exe
+  InstallerUrl: https://github.com/ehk2509/ai-coding-context-optimizer/releases/download/v__VERSION__/acco-windows-arm64.exe
   InstallerSha256: __WINDOWS_ARM64_SHA256__
 ManifestType: installer
 ManifestVersion: 1.12.0

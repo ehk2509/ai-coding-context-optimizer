@@ -1,5 +1,22 @@
 # Unreleased
 
+# 1.22.1 - 2026-09-28
+
+- **Migrated project hosting identity to `ehk2509`.** Repository URLs, Claude
+  marketplace metadata, standalone installers, Homebrew publishing, benchmark
+  fixtures, product UX, and documentation now target
+  `ehk2509/ai-coding-context-optimizer`.
+- **Moved the unused WinGet identity to `ehk2509.ACCO`.** ACCO had no installed
+  WinGet user base, so the package identifier and manifest filenames were
+  migrated before public adoption rather than carrying the old account-derived
+  identifier indefinitely.
+- **Added an identity regression guard.** CI now scans tracked text and filenames
+  so the previous GitHub handle or WinGet package identifier cannot silently
+  re-enter release/install surfaces.
+- No runtime feature, retrieval, ranking, compression, or benchmark claim changes
+  are introduced by this patch release.
+
+
 # 1.22.0 - 2026-09-27
 
 - **Added an explicit host transport capability registry.** `acco transport-status`
@@ -70,7 +87,7 @@
   process exit; Linux/macOS replace atomically in place.
 - **Preserved native package-manager ownership.** Frozen binaries installed by
   Homebrew or WinGet route `acco update` back through `brew upgrade acco` or
-  `winget upgrade --id ElyesHkiri.ACCO` instead of mutating package-managed
+  `winget upgrade --id ehk2509.ACCO` instead of mutating package-managed
   files directly.
 - **Expanded standalone releases to six native targets.** Release and PR smoke
   matrices now cover Linux x86_64/ARM64, macOS ARM64/Intel, and Windows
@@ -83,7 +100,7 @@
 - **Prepared package-manager-native distribution.** Releases now generate an
   architecture-complete Homebrew formula and WinGet 1.12 multi-file manifests
   from the actual release checksums. A secret-gated publisher workflow can
-  create/update `elyeshkiri/homebrew-acco` and submit WinGet manifests;
+  create/update `ehk2509/homebrew-acco` and submit WinGet manifests;
   absent publisher credentials, those external steps visibly no-op rather than
   claiming publication.
 
