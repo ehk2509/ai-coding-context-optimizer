@@ -11,6 +11,39 @@ recovery, and transcript analysis run locally.
 Optional external/model integrations can have their own network behavior; use
 their documentation and credentials deliberately.
 
+## Out-of-context programmable execution
+
+The MCP `execute` tool and SDK `execute` method are designed for local
+aggregation/filtering over large repository text without first placing the
+source bytes in model context.
+
+The execution engine:
+
+- accepts only explicit files that resolve inside the configured repository root;
+- rejects binary inputs and caps each invocation at 128 files / 32 MiB total;
+- parses the submitted Python before execution and rejects imports, class/async
+  constructs, dynamic evaluation/introspection helpers, arbitrary `open`,
+  private/dunder names and attributes, and repository path escapes;
+- runs the accepted program in a separate isolated-startup Python process with a
+  minimal environment and a 1–30 second wall-clock limit;
+- exposes only a small builtin/data-analysis surface and requires one
+  JSON-serializable `result`;
+- caps the model-visible result; oversized exact JSON is stored in the same
+  project-scoped recovery store and returned by handle.
+
+These controls reduce accidental capability and contain ordinary agent-generated
+analysis programs. They are **not a hardened security sandbox** for deliberately
+hostile Python. ACCO does not claim kernel/container isolation, seccomp,
+namespaces, VM isolation, or a proof that every Python object-model escape is
+impossible. Do not expose the local MCP/SDK bridge to untrusted users and do not
+execute code supplied by an untrusted remote party merely because the restricted
+surface rejected common escape primitives.
+
+The child process receives the selected file contents through its stdin payload;
+it does not need direct filesystem APIs. Oversized computed results follow the
+normal exact-recovery boundary. The original selected source files are not copied
+into the recovery store merely because they were analyzed.
+
 ## Repository contents
 
 ACCO may read source files to build structural/retrieval indexes and
