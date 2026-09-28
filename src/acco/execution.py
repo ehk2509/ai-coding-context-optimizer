@@ -136,6 +136,20 @@ sys.stdout.buffer.write(encoded.encode("utf-8"))
 """
 
 
+def execution_worker_main() -> int:
+    """Run the private execution worker inside a frozen standalone executable."""
+    namespace: dict[str, Any] = {}
+    exec(_RUNNER, namespace, namespace)
+    return 0
+
+
+def _worker_command() -> list[str]:
+    """Return a child command for Python installs or frozen ACCO binaries."""
+    if getattr(sys, "frozen", False):
+        return [sys.executable, "__acco-execution-worker"]
+    return [sys.executable, "-I", "-S", "-c", _RUNNER]
+
+
 class ExecutionValidationError(ValueError):
     """Raised when a requested analysis program crosses the restricted boundary."""
 
@@ -356,7 +370,7 @@ def execute_program(
     started = time.monotonic()
     try:
         process = subprocess.run(
-            [sys.executable, "-I", "-S", "-c", _RUNNER],
+            _worker_command(),
             input=payload.encode("utf-8"),
             capture_output=True,
             timeout=normalized_limits.timeout_seconds,
