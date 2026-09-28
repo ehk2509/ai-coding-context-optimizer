@@ -1,5 +1,13 @@
 # Unreleased
 
+- **Migrated project hosting identity to `ehk2509`.** Repository URLs, Claude
+  marketplace metadata, standalone installers, Homebrew publishing, and
+  documentation now target `ehk2509/ai-coding-context-optimizer`. Because
+  ACCO has no installed WinGet user base yet, the not-yet-adopted package
+  identifier and manifest layout also move from the old account-derived ID to
+  `ehk2509.ACCO` before public adoption.
+
+
 # 1.22.0 - 2026-09-27
 
 - **Added an explicit host transport capability registry.** `acco transport-status`
