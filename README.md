@@ -60,12 +60,13 @@ code-signing/notarization when publisher credentials are configured; see
 integration entries, installs the safe local profile, adds Claude Lean when it
 can do so without overwriting user content, warms the structural repository
 index, and runs its own readiness check. Native project hooks are installed for
-Claude Code, Cursor, Gemini CLI, Qwen Code, and Copilot CLI where their public
+Claude Code, Codex, Cursor, Gemini CLI, Qwen Code, and Copilot CLI where their public
 hook contracts support enforceable interception. It is safe to rerun after
 upgrades as a repair/migration step. Configure hosts explicitly when needed:
 
 ```bash
 acco setup . --host claude --host cursor
+acco setup . --host codex
 acco setup . --host gemini --host qwen
 acco setup . --host copilot
 acco setup . --host all
@@ -172,11 +173,13 @@ processors, the context auditor covers cross-host instruction bloat, and the
 status line surfaces local efficiency signals continuously. See
 [Everyday efficiency surfaces](docs/EVERYDAY_EFFICIENCY.md).
 
-Native hook adapters now make a second layer automatic. Cursor/Gemini/Qwen/
-Copilot project hooks reuse the same host-neutral runtime as Claude rather than
-duplicating compression policy. Copilot and Gemini can replace large successful
-tool results before they enter model context; Cursor and Qwen are limited to the
-pre-tool/prompt/lifecycle controls their public hook contracts actually expose.
+Native hook adapters now make a second layer automatic. Codex/Cursor/Gemini/
+Qwen/Copilot project hooks reuse the same host-neutral runtime as Claude rather
+than duplicating compression policy. Copilot and Gemini provide direct successful
+result-replacement fields; trusted Codex project hooks use the documented
+PostToolUse continue/additional-context path to suppress large local Bash/MCP
+results and deliver ACCO's compact recoverable representation. Cursor and Qwen
+remain limited to the controls their public hook contracts actually expose.
 See [Coding-agent integrations](INTEGRATIONS.md).
 
 These mechanisms remain independently measurable. Operational token estimates
