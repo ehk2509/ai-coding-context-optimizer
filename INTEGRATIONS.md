@@ -94,7 +94,7 @@ The enforced capabilities intentionally differ by host:
 | Claude Code | yes | yes | Bash + eligible Read |
 | Cursor | yes via `preToolUse` | prompt block + session/compact/stop | not for general built-in results; Cursor only documents replacement for MCP results |
 | Gemini CLI | yes via `BeforeTool` | yes via `BeforeAgent` / session hooks | yes; `AfterTool` can hide the original and use ACCO's compact result as replacement |
-| Qwen Code | yes via `PreToolUse` | yes via `UserPromptSubmit` / session hooks | not claimed; documented PostToolUse is used for context/decisions, not a general success-result rewrite |
+| Qwen Code | yes via `PreToolUse` | conditional prompt ingress via provenance-carrying `submitted_prompt`; session hooks yes | no general successful-result rewrite; PostToolUse supports context/decisions only |
 | Copilot CLI | yes via `PreToolUse` | session/compact/stop; command prompt hooks cannot inject/modify the prompt | yes via `modifiedResult` |
 
 For Gemini and Copilot, the replacement-capable post-tool adapter is deliberately
