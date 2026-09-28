@@ -98,6 +98,20 @@ def test_execute_rejects_repository_path_escape(tmp_path, monkeypatch):
         execute_program(root, "result = len(data)", ["../secret.txt"])
 
 
+def test_execute_preserves_unicode_through_isolated_subprocess(tmp_path, monkeypatch):
+    """Execution transport must remain UTF-8 deterministic on every host OS."""
+    root = _repo(tmp_path, monkeypatch)
+    (root / "unicode.txt").write_text("café\nمرحبا\n東京\n", encoding="utf-8")
+
+    result = execute_program(
+        root,
+        'result = data["unicode.txt"].splitlines()',
+        ["unicode.txt"],
+    )
+
+    assert result["result"] == ["café", "مرحبا", "東京"]
+
+
 def test_execute_times_out_runaway_programs(tmp_path, monkeypatch):
     """A non-terminating analysis must be killed at the wall-clock limit."""
     root = _repo(tmp_path, monkeypatch)
