@@ -71,7 +71,7 @@ def test_marketplace_uses_explicit_command_source_and_renderer():
     command = source["command"]
     assert f"acco>={__version__}" in command
     assert "pip install --user --quiet" in command
-    assert "git+https://github.com/elyeshkiri/ai-coding-context-optimizer.git" in command
+    assert "git+https://github.com/ehk2509/ai-coding-context-optimizer.git" in command
     assert "render_plugin" in command
     assert len(command) <= 500
     assert all(32 <= ord(character) <= 126 for character in command)
