@@ -370,7 +370,7 @@ jobs:
               out.write("## Frozen real CLI output comparison\n\n")
               out.write("| Engine | Weighted token reduction | Critical survival | Changed cases |\n")
               out.write("| --- | ---: | ---: | ---: |\n")
-              for key in ("elyeshkiri", "ppgranger"):
+              for key in ("ehk2509", "ppgranger"):
                   summary = report[key]["summary"]
                   out.write(
                       f"| {key} | {summary['weighted_token_reduction'] * 100:.2f}% "
@@ -454,7 +454,7 @@ jobs:
                   "Git/Go target reduction | Git/Go critical survival |\n"
               )
               out.write("| --- | ---: | ---: | ---: | ---: |\n")
-              for key in ("elyeshkiri", "ppgranger"):
+              for key in ("ehk2509", "ppgranger"):
                   overall = report[key]["summary"]
                   target = subset_summary(report[key]["cases"])
                   out.write(
@@ -534,7 +534,7 @@ jobs:
                   "Git log/status reduction |\n"
               )
               out.write("| --- | ---: | ---: | ---: | ---: | ---: |\n")
-              for key in ("elyeshkiri", "ppgranger"):
+              for key in ("ehk2509", "ppgranger"):
                   overall = report[key]["summary"]
                   log = subset(report[key]["cases"], ("git-log-",))
                   status = subset(report[key]["cases"], ("git-status-",))
