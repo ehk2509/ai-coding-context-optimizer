@@ -22,6 +22,13 @@ I believe the issue stems from https://github.com/example/blob/scales.py#L377
 """
 
 
+_ISSUE = (
+    "Legend values are wrong for large ranges: numbers in the order of 1E6 are "
+    "shown without their multiplicative offset, so a legend reads 1, 2, 3 instead "
+    "of 1e6, 2e6, 3e6. This makes plots of large-magnitude data misleading. "
+)
+
+
 def test_checklist_names_the_second_path_the_issue_mentions():
     items = extract_task_checklist(SEABORN_LIKE)
     assert items[0] == (
@@ -39,10 +46,7 @@ def test_note_lists_items_and_demands_checking_each():
 
 
 def test_single_also_sentence_naming_a_new_api_counts_as_two_items():
-    prompt = (
-        "Legend values drop the offset in `so.Plot`.\n\n"
-        "The issue also reproduces with `scatterplot`."
-    )
+    prompt = _ISSUE + "It shows in `so.Plot`.\n\nThe issue also reproduces with `scatterplot`."
     items = extract_task_checklist(prompt)
     assert items[0] == "the primary behaviour reported in the task"
     assert "`scatterplot`" in items[1]
@@ -84,3 +88,28 @@ def test_tracebacks_and_repeated_examples_are_not_separate_items():
 
 def test_also_without_a_code_reference_is_ignored():
     assert extract_task_checklist("It is also slow. Please fix it.") == []
+
+
+def test_call_reference_is_judged_by_its_function_name_not_its_arguments():
+    # Review finding: `scatterplot(data=df)` used to be judged by `df`.
+    prompt = (
+        _ISSUE + "It happens in `so.Plot(df)`. "
+        "The issue also reproduces with `scatterplot(data=df)`."
+    )
+    assert any("`scatterplot(data=df)`" in item for item in extract_task_checklist(prompt))
+
+
+def test_uniqueness_counts_whole_words_only():
+    # Review finding: "scatterplots" used to hide `scatterplot`.
+    prompt = (
+        _ISSUE + "Seen in scatterplots made with objects. "
+        "The issue also reproduces with `scatterplot`."
+    )
+    assert any("`scatterplot`" in item for item in extract_task_checklist(prompt))
+
+
+def test_short_follow_ups_and_file_names_do_not_trigger_a_checklist():
+    # Review finding: "Please also update `README.md`." injected a fake checklist.
+    assert extract_task_checklist("Thanks. Please also update `README.md`.") == []
+    assert extract_task_checklist("Thanks. Please also rename `render_legend`.") == []
+    assert task_checklist_note(_ISSUE + "Please also update `README.md`.") is None

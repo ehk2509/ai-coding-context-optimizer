@@ -27,6 +27,13 @@ _ALSO_RE = re.compile(
 )
 _SENTENCE_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z`(\"'])")
 _URL_RE = re.compile(r"https?://\S+")
+_FILE_RE = re.compile(
+    r"[\w./-]+\.(?:py|pyi|md|rst|txt|json|toml|ya?ml|cfg|ini|js|ts|tsx|jsx|"
+    r"go|rs|java|c|h|cpp|html|css|sh|lock)"
+)
+# A lone "also" sentence implies a separate primary issue only when the rest
+# of the prompt actually describes one; short follow-ups do not qualify.
+MIN_PRIMARY_CHARS = 200
 _TRACEBACK_RE = re.compile(r"Traceback \(most recent call last\)|^\s*File \"", re.MULTILINE)
 # Calls that describe setup rather than a distinct code path under test.
 _NOISE_CALLS = {
@@ -46,9 +53,21 @@ def _shorten(text: str) -> str:
 
 
 def _identifier(ref: str) -> str:
-    """Return the bare name a code reference points at (`a.b(x)` -> b)."""
-    names = re.findall(r"[A-Za-z_]\w*", ref)
+    """Return the bare name a code reference points at (`a.b(x)` -> b).
+
+    File names are not code paths: `README.md` yields "".
+    """
+    ref = ref.strip("`").strip()
+    if _FILE_RE.fullmatch(ref):
+        return ""
+    head = ref.split("(", 1)[0]
+    names = re.findall(r"[A-Za-z_]\w*", head)
     return names[-1] if names else ""
+
+
+def _mentions(prompt: str, name: str) -> int:
+    """Count whole-word, case-insensitive mentions of ``name``."""
+    return len(re.findall(rf"(?<!\w){re.escape(name)}(?!\w)", prompt, re.IGNORECASE))
 
 
 def _block_calls(code: str) -> tuple[str, ...]:
@@ -79,7 +98,6 @@ def extract_task_checklist(prompt: str) -> list[str]:
         examples.append(f"code example {index} from the task (calls {', '.join(calls)})")
     others: list[str] = []
     prose = _URL_RE.sub("", _FENCE_RE.sub("\n", prompt))
-    lowered = prompt.lower()
     for line in prose.splitlines():
         for sentence in _SENTENCE_RE.split(" ".join(line.split())):
             if not _ALSO_RE.search(sentence):
@@ -89,7 +107,7 @@ def extract_task_checklist(prompt: str) -> list[str]:
             # function (pylint's "also, the help for `verbose`…") is not a
             # separate item; listing it pulled agents toward the wrong fix.
             if any(
-                lowered.count(_identifier(ref).lower()) == 1
+                _mentions(prompt, _identifier(ref)) == 1
                 for ref in _CODE_REF_RE.findall(sentence)
                 if _identifier(ref)
             ):
@@ -98,6 +116,12 @@ def extract_task_checklist(prompt: str) -> list[str]:
     # another affected path/API makes the task multi-path.
     if not others:
         return []
+    if not examples:
+        described = prose
+        for item in others:
+            described = described.replace(item.strip('"').rstrip("…"), "")
+        if len(" ".join(described.split())) < MIN_PRIMARY_CHARS:
+            return []
     primary = examples or ["the primary behaviour reported in the task"]
     return list(dict.fromkeys(primary + others))[:MAX_ITEMS]
 
