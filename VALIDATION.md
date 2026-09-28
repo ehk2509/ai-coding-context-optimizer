@@ -1,4 +1,26 @@
-# Validation for 1.22.0
+# Validation for 1.22.1
+
+## 1.22.1 repository identity migration
+
+Version 1.22.1 is a distribution/identity patch. It does not change ACCO's
+retrieval, ranking, compression, routing, workspace, or context-budget
+algorithms.
+
+Mechanical validation covers:
+
+- repository, Claude marketplace, installer, documentation, benchmark, and
+  product-UX references migrated to `ehk2509/ai-coding-context-optimizer`;
+- Homebrew publishing migrated to `ehk2509/homebrew-acco` and
+  `brew tap ehk2509/acco`;
+- the pre-adoption WinGet package identity migrated to `ehk2509.ACCO`,
+  including manifest template filenames and generated paths;
+- a tracked-file regression guard that fails when the previous GitHub handle or
+  previous WinGet package identifier appears in tracked text or filenames;
+- the complete 19-job CI matrix, including native Windows full-suite,
+  retrieval-quality and product-UX gates.
+
+This patch creates no new performance, quality, token-saving, or
+cost-per-success claim.
 
 ## 1.22 workspace federation and whole-context orchestration
 
