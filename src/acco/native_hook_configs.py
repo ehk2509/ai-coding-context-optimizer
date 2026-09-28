@@ -86,7 +86,7 @@ def _cursor_entries() -> dict[str, list[dict[str, Any]]]:
 
 
 def _nested_entries(host: str) -> dict[str, list[dict[str, Any]]]:
-    """Return Gemini/Qwen nested command-hook definitions."""
+    """Return Gemini/Qwen/Codex nested command-hook definitions."""
     if host == "gemini":
         specs = {
             "BeforeTool": ("^(read_file|run_shell_command)$",),
