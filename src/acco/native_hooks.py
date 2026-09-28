@@ -12,6 +12,7 @@ replacement, while Gemini and Copilot can replace/hide a successful tool result.
 
 from __future__ import annotations
 
+from dataclasses import replace
 import json
 import os
 from pathlib import Path
@@ -207,7 +208,15 @@ def normalize_payload(host: str, event: str, payload: dict) -> dict:
             or ""
         )
         raw_tool = str(raw_tool)
-        normalized["tool_name"] = _TOOL_MAP[host].get(raw_tool, raw_tool)
+        canonical_tool = _TOOL_MAP[host].get(raw_tool, raw_tool)
+        if (
+            canonical_event == "PostToolUse"
+            and host in {"gemini", "copilot"}
+            and canonical_tool
+            not in {"Bash", "Grep", "WebFetch", "WebSearch", "Read", "Write", "Edit"}
+        ):
+            canonical_tool = "GenericOutput"
+        normalized["tool_name"] = canonical_tool
         normalized["tool_input"] = _parse_mapping(
             payload.get("tool_input", payload.get("toolArgs"))
         )
@@ -451,10 +460,41 @@ def adapt_response(host: str, event: str, response: dict | None) -> dict:
 
 def run_native_hook(host: str, event: str, payload: dict) -> dict:
     """Run one native host event through ACCO's existing policy runtime."""
-    from .hook import run
+    from .hook import _runtime
+    from .hook_runtime import HookRuntime
 
     normalized = normalize_payload(host, event, payload)
-    _code, response = run(normalized)
+    runtime = _runtime(Path(normalized["cwd"]))
+
+    if normalized["hook_event_name"] == "PostToolUse" and host in {
+        "gemini",
+        "copilot",
+    }:
+        runtime = HookRuntime(
+            runtime.services,
+            replace(
+                runtime.config,
+                filterable_tools=frozenset(
+                    {"Bash", "Grep", "WebFetch", "WebSearch", "GenericOutput"}
+                ),
+            ),
+        )
+
+    if host == "cursor" and normalized["hook_event_name"] == "UserPromptSubmit":
+        # Cursor's beforeSubmitPrompt can block but cannot inject arbitrary model
+        # context. Keep ingress enforcement, but do not pretend output-policy or
+        # model-routing notes reached the model.
+        runtime = HookRuntime(
+            runtime.services,
+            replace(
+                runtime.config,
+                output_policy_enabled=False,
+                output_telemetry_enabled=False,
+                model_routing_enabled=False,
+            ),
+        )
+
+    _code, response = runtime.run(normalized)
     return adapt_response(host, event, response)
 
 
