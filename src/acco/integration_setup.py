@@ -53,6 +53,22 @@ from .host_configs import (
     validate_hermes_manageable,
     validate_opencode_manageable,
 )
+from .native_hook_configs import (
+    copilot_hooks_path,
+    cursor_hooks_path,
+    gemini_settings_path,
+    install_copilot_hooks,
+    install_cursor_hooks,
+    install_gemini_hooks,
+    install_qwen_hooks,
+    native_hooks_configured,
+    qwen_settings_path,
+    uninstall_copilot_hooks,
+    uninstall_cursor_hooks,
+    uninstall_gemini_hooks,
+    uninstall_qwen_hooks,
+    validate_copilot_hooks_manageable,
+)
 from .policy import SKILL_TEXT
 from .repository_service import RepositoryContextService
 from .runtime_config import CONFIG_NAME, find_project_config, settings_for
@@ -67,6 +83,8 @@ HOSTS = (
     "hermes",
     "copilot",
     "antigravity",
+    "gemini",
+    "qwen",
 )
 HOST_EXECUTABLES = {
     "claude": "claude",
@@ -77,6 +95,8 @@ HOST_EXECUTABLES = {
     "hermes": "hermes",
     "copilot": "copilot",
     "antigravity": "agy",
+    "gemini": "gemini",
+    "qwen": "qwen",
 }
 CODEX_START = "# >>> acco managed >>>"
 CODEX_END = "# <<< acco managed <<<"
