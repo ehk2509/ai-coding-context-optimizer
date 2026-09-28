@@ -1,11 +1,20 @@
 # Unreleased
 
+# 1.22.1 - 2026-09-28
+
 - **Migrated project hosting identity to `ehk2509`.** Repository URLs, Claude
-  marketplace metadata, standalone installers, Homebrew publishing, and
-  documentation now target `ehk2509/ai-coding-context-optimizer`. Because
-  ACCO has no installed WinGet user base yet, the not-yet-adopted package
-  identifier and manifest layout also move from the old account-derived ID to
-  `ehk2509.ACCO` before public adoption.
+  marketplace metadata, standalone installers, Homebrew publishing, benchmark
+  fixtures, product UX, and documentation now target
+  `ehk2509/ai-coding-context-optimizer`.
+- **Moved the unused WinGet identity to `ehk2509.ACCO`.** ACCO had no installed
+  WinGet user base, so the package identifier and manifest filenames were
+  migrated before public adoption rather than carrying the old account-derived
+  identifier indefinitely.
+- **Added an identity regression guard.** CI now scans tracked text and filenames
+  so the previous GitHub handle or WinGet package identifier cannot silently
+  re-enter release/install surfaces.
+- No runtime feature, retrieval, ranking, compression, or benchmark claim changes
+  are introduced by this patch release.
 
 
 # 1.22.0 - 2026-09-27
