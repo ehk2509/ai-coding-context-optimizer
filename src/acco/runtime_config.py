@@ -38,6 +38,7 @@ class RuntimeSettings:
     max_lines: int | None = None
     keep_tail: int = 15
     output_policy: bool = True
+    output_task_checklist: bool = True
     output_mode: str = "normal"
     output_task: str = "auto"
     output_adaptive: bool = True
@@ -246,6 +247,7 @@ def _load_file(start: Path | None = None) -> RuntimeSettings:
         max_lines=_optional_positive_int(hooks.get("max_lines"), None),
         keep_tail=max(0, keep_tail),
         output_policy=_bool(output.get("enabled"), True),
+        output_task_checklist=_bool(output.get("task_checklist"), True),
         output_mode=_choice(output.get("mode"), "normal", OUTPUT_MODES),
         output_task=_choice(output.get("task"), "auto", OUTPUT_TASK_OPTIONS),
         output_adaptive=_bool(output.get("adaptive"), True),
@@ -491,6 +493,9 @@ def settings_for(start: Path | None = None) -> RuntimeSettings:
         max_lines=max_lines,
         keep_tail=int(keep_tail if keep_tail is not None else base.keep_tail),
         output_policy=_env_bool("ACCO_OUTPUT_POLICY", base.output_policy),
+        output_task_checklist=_env_bool(
+            "ACCO_TASK_CHECKLIST", base.output_task_checklist
+        ),
         output_mode=_env_choice(
             "ACCO_OUTPUT_MODE", base.output_mode, OUTPUT_MODES
         ),

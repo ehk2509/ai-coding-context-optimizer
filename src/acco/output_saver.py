@@ -191,6 +191,10 @@ def build_output_policy(
         "Before finishing a code change, run the project's existing tests for the code you touched "
         "and fix any regressions; a passing reproduction alone is not sufficient.",
         "Do not rerun an unchanged failing command without new evidence or a meaningful code/config change.",
+        # Focused verification only covers what was touched; agents that stopped
+        # after fixing the first of several reported code paths shipped partial fixes.
+        "Before finishing, re-read the task: every reported symptom, code path, API, and reproduction "
+        "it mentions must be addressed and checked, not only the first one fixed.",
         "Stop once the acceptance criteria are satisfied and the relevant tests pass.",
     ])
     return OutputPolicy(normalized, budget, instructions, task_normalized)

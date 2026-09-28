@@ -103,6 +103,54 @@ def test_user_prompt_auto_policy_can_be_disabled(tmp_path, monkeypatch):
     ) == (0, None)
 
 
+_MULTI_PATH_PROMPT = (
+    "Implement a fix for wrong legend values.\n"
+    "```python\nso.Plot(df, x='a').add(so.Dot())\n```\n"
+    "The issue also reproduces if you use `scatterplot`."
+)
+
+
+def test_user_prompt_injects_task_checklist_by_default(tmp_path, monkeypatch):
+    """Multi-path prompts get a checklist next to the generation policy."""
+    monkeypatch.setenv("ACCO_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.delenv("ACCO_TASK_CHECKLIST", raising=False)
+
+    code, response = run(
+        {
+            "hook_event_name": "UserPromptSubmit",
+            "cwd": str(tmp_path),
+            "session_id": "session-1",
+            "prompt": _MULTI_PATH_PROMPT,
+        }
+    )
+
+    context = response["hookSpecificOutput"]["additionalContext"]
+    assert code == 0
+    assert "ACCO GENERATION POLICY" in context
+    assert "ACCO TASK CHECKLIST" in context
+    assert "`scatterplot`" in context
+
+
+def test_user_prompt_task_checklist_env_switch(tmp_path, monkeypatch):
+    """ACCO_TASK_CHECKLIST=0 removes only the checklist."""
+    monkeypatch.setenv("ACCO_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("ACCO_TASK_CHECKLIST", "0")
+
+    code, response = run(
+        {
+            "hook_event_name": "UserPromptSubmit",
+            "cwd": str(tmp_path),
+            "session_id": "session-1",
+            "prompt": _MULTI_PATH_PROMPT,
+        }
+    )
+
+    context = response["hookSpecificOutput"]["additionalContext"]
+    assert code == 0
+    assert "ACCO GENERATION POLICY" in context
+    assert "ACCO TASK CHECKLIST" not in context
+
+
 def test_prompt_and_stop_hooks_capture_real_usage_without_content(
     tmp_path, monkeypatch
 ):
