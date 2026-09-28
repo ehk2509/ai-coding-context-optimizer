@@ -191,8 +191,8 @@ CLIENT_CAPABILITIES = {
             "does not expose a documented general successful-result replacement."
         ),
         pre_tool_intercept="yes",
-        post_tool_replace="conditional",
-        prompt_ingress="yes",
+        post_tool_replace="no",
+        prompt_ingress="conditional",
         session_hooks="yes",
         mcp="conditional",
         dynamic_mcp_refresh="conditional",
