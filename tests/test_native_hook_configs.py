@@ -7,15 +7,19 @@ import json
 import pytest
 
 from acco.native_hook_configs import (
+    codex_hooks_path,
+    codex_project_config_path,
     copilot_hooks_path,
     cursor_hooks_path,
     gemini_settings_path,
+    install_codex_hooks,
     install_copilot_hooks,
     install_cursor_hooks,
     install_gemini_hooks,
     install_qwen_hooks,
     native_hooks_configured,
     qwen_settings_path,
+    uninstall_codex_hooks,
     uninstall_copilot_hooks,
     uninstall_cursor_hooks,
     uninstall_gemini_hooks,
@@ -181,3 +185,68 @@ def test_gemini_and_qwen_timeout_units_follow_host_contracts(tmp_path):
 
     assert gemini_timeout == 10_000
     assert qwen_timeout == 10
+
+
+def test_codex_hook_install_is_idempotent_and_preserves_user_groups(tmp_path):
+    """Codex hooks.json should merge only ACCO-owned nested command handlers."""
+    path = codex_hooks_path(tmp_path)
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        json.dumps(
+            {
+                "description": "user hooks",
+                "hooks": {
+                    "PreToolUse": [
+                        {
+                            "matcher": "^apply_patch$",
+                            "hooks": [
+                                {
+                                    "type": "command",
+                                    "command": "./user-review.sh",
+                                    "timeout": 5,
+                                }
+                            ],
+                        }
+                    ]
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    install_codex_hooks(tmp_path)
+    install_codex_hooks(tmp_path)
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    serialized = json.dumps(payload)
+    assert payload["description"] == "user hooks"
+    assert serialized.count("./user-review.sh") == 1
+    assert serialized.count("acco hook --host codex --event PreToolUse") == 2
+    assert native_hooks_configured(tmp_path, "codex") is True
+
+    post = payload["hooks"]["PostToolUse"][0]["hooks"][0]
+    assert post["timeout"] == 10
+    assert post["commandWindows"] == "acco hook --host codex --event PostToolUse"
+    assert post["additionalContextLimit"] == 2500
+    assert "name" not in post
+
+    uninstall_codex_hooks(tmp_path)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    serialized = json.dumps(payload)
+    assert "./user-review.sh" in serialized
+    assert "acco hook --host codex" not in serialized
+
+
+def test_codex_setup_refuses_to_mix_hooks_json_with_inline_hook_tables(tmp_path):
+    """ACCO should not create a second Codex hook representation in one layer."""
+    config = codex_project_config_path(tmp_path)
+    config.parent.mkdir(parents=True)
+    config.write_text(
+        'model = "gpt-6-codex"\n\n[[hooks.PreToolUse]]\nmatcher = "^Bash$"\n',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="already defines inline Codex hooks"):
+        install_codex_hooks(tmp_path)
+
+    assert not codex_hooks_path(tmp_path).exists()
