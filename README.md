@@ -227,6 +227,38 @@ rows = acco.database().optimize(
 )
 ```
 
+### Out-of-context programmable execution
+
+For large repository-local logs, JSON, generated reports, fixtures, or other
+text data, ACCO can compute over the bytes **without putting those bytes into the
+model context**:
+
+```python
+analysis = acco.execute(
+    """
+lines = data["artifacts/test.log"].splitlines()
+result = {
+    "total": len(lines),
+    "errors": sum("ERROR" in line for line in lines),
+}
+""",
+    ["artifacts/test.log"],
+)
+```
+
+The same primitive is MCP tool `execute` (typically rendered by clients as
+`mcp__acco__execute`) and TypeScript `AccoClient.execute(...)`. Adaptive MCP
+disclosure reveals it for data-heavy analysis tasks rather than adding its
+schema to the default core.
+
+Execution uses a restricted Python subprocess with explicit repository-contained
+text inputs, no imports, no shell/process API, no arbitrary filesystem access,
+no private/dunder traversal, hard input/time/result bounds, and JSON-only
+results. Oversized computed results receive a `tsr_...` handle so the exact
+result remains recoverable instead of being silently truncated. This is a
+defensive local execution boundary, not a hardened container for hostile code;
+see [Security & privacy](SECURITY.md).
+
 These adapters operate only on caller-supplied data already in memory: they do
 not retrieve documents, fetch APIs, open databases, or execute SQL. See
 [Middleware SDKs](docs/SDK.md).

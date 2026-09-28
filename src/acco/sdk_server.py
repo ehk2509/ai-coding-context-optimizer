@@ -169,6 +169,19 @@ class SdkApplication:
                 **self._options(body),
             )
 
+        if path == "/v1/execute":
+            code = body.get("code")
+            files = body.get("files")
+            if not isinstance(code, str):
+                raise ValueError("code must be a string")
+            if not isinstance(files, list):
+                raise ValueError("files must be a JSON array")
+            return 200, self.engine.execute(
+                code,
+                [str(value) for value in files],
+                **self._options(body),
+            )
+
         if path == "/v1/context-budget":
             prompt = body.get("prompt")
             if not isinstance(prompt, str):

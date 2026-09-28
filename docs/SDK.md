@@ -46,6 +46,7 @@ acco.optimize_browser_context(
 )
 acco.optimize_output(stdout, command="pytest -q", exit_code=1)
 acco.route_model(prompt, current_model="claude-sonnet-5")
+acco.execute('result = len(data["build.log"].splitlines())', ["build.log"])
 acco.recover("tsr_...")
 ```
 
@@ -146,6 +147,57 @@ a transparent business-API response rewriter.
 All three surfaces use ACCO's shared structural JSON compaction, token/byte
 reduction gates, and recovery store. If exact recovery cannot be persisted, the
 full input representation is returned unchanged.
+
+## Out-of-context programmable execution
+
+Large local data often does not need to be read by the model at all. The Python
+engine, MCP server, loopback bridge, and TypeScript client expose the same
+restricted execution primitive:
+
+```python
+analysis = acco.execute(
+    """
+rows = json_loads(data["artifacts/results.json"])
+failed = [row["name"] for row in rows if row.get("status") == "failed"]
+result = {"count": len(failed), "failed": failed[:20]}
+""",
+    ["artifacts/results.json"],
+    timeout_seconds=5,
+    max_result_bytes=64 * 1024,
+)
+```
+
+The program receives `data` and `files`, both mappings from normalized
+repository-relative path to decoded UTF-8 text. It must assign a JSON-serializable
+value to `result`. ACCO also preloads bounded analysis helpers:
+`Counter`, `mean`, `median`, `json_loads`, `json_dumps`,
+`regex_findall`, `regex_search`, and `regex_sub`.
+
+The restricted language rejects imports, class definitions, async execution,
+arbitrary `open`, dynamic evaluation/introspection helpers, private/dunder
+attribute traversal, and paths outside the configured repository root. The
+subprocess runs with isolated Python startup, a minimal environment, a wall-clock
+timeout, at most 128 text files / 32 MiB of input, and a bounded model-visible
+result. These controls are defense in depth; this is not an OS/VM sandbox for
+hostile code.
+
+When the JSON result exceeds the model-visible result limit, ACCO stores the
+exact serialized result in the project recovery store and returns only a bounded
+preview plus a `tsr_...` handle. If exact recovery cannot be stored, ACCO
+returns no lossy substitute.
+
+TypeScript:
+
+```ts
+const analysis = await acco.execute(
+  'result = {"lines": len(data["build.log"].splitlines())}',
+  ["build.log"],
+);
+```
+
+MCP exposes the same operation as `execute`; adaptive tool discovery selects it
+for tasks involving large logs/JSON, aggregation, scans, statistics, or batch
+analysis.
 
 ## Whole-context planning
 
@@ -260,6 +312,7 @@ The bridge exposes only versioned JSON endpoints:
 | `POST` | `/v1/middleware/api` | optional JSON API-payload context compression |
 | `POST` | `/v1/middleware/database` | optional caller-supplied row compression |
 | `POST` | `/v1/output/optimize` | command-aware output optimization |
+| `POST` | `/v1/execute` | restricted computation over repository-local text files |
 | `POST` | `/v1/context-budget` | deterministic whole-context allocation |
 | `POST` | `/v1/route` | deterministic model-routing decision |
 | `POST` | `/v1/recover` | exact recovery by `tsr_...` handle |
@@ -277,9 +330,10 @@ The SDK does not weaken ACCO's existing transformation rules:
    original text if the recovery store has insufficient capacity.
 4. Browser optimization is local and caller-supplied only: it does not navigate, fetch URLs, execute page code, or process screenshot pixels. Ordinary JSON stays on the general context path.
 5. Structured RAG/API/database middleware operates only on caller-supplied in-memory JSON-compatible data and does not retrieve, fetch, connect, or execute queries.
-6. Model routing is the existing deterministic ACCO policy. A route decision is
+6. Programmable execution is limited to explicit repository-contained text inputs and a restricted Python surface; it is not a hardened hostile-code sandbox.
+7. Model routing is the existing deterministic ACCO policy. A route decision is
    not an independent benchmark of model quality.
-7. The TypeScript bridge binds to `127.0.0.1` by default.
+8. The TypeScript bridge binds to `127.0.0.1` by default.
 
 The bridge has no built-in remote authentication because it is designed as a
 local process boundary. `--allow-non-loopback` is explicit and should only be

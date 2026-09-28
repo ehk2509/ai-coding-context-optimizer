@@ -728,6 +728,47 @@ This makes host behavior testable without filesystem-backed session state or a
 Claude process, and lets another host reuse the same runtime policy with a
 different adapter.
 
+## Out-of-context execution boundary
+
+Programmable execution is a separate application primitive in
+`acco.execution`. It does not live in the MCP transport, Claude hook, output
+pipeline, or repository ranking engine.
+
+The data flow is intentionally narrow:
+
+```text
+explicit repository-relative files
+        ↓
+root/path + byte-count validation
+        ↓
+restricted Python AST validation
+        ↓
+isolated-startup subprocess
+        ↓
+JSON-serializable result
+        ↓
+small result → return directly
+large result → exact recovery store + bounded preview
+```
+
+The model supplies only the analysis program and file names. ACCO reads the
+selected source locally and passes it directly to the child process, so the
+large bytes do not need to be copied through model context merely to count,
+group, filter, scan, or summarize them.
+
+The language surface rejects imports, arbitrary file access, process/shell
+entry points, dynamic evaluation/introspection helpers, private/dunder traversal,
+class/async constructs, and repository path escapes. The process also receives
+hard file/input/result/time limits and a minimal environment. These controls are
+defense in depth rather than an OS-level hostile-code sandbox; the security
+contract is documented explicitly in `SECURITY.md`.
+
+`AccoEngine.execute`, MCP `execute`, and the loopback/TypeScript SDK all
+delegate to this single implementation. MCP adaptive disclosure treats execution
+as a specialist surface rather than expanding the always-advertised core tool
+set. Oversized computed results reuse `RecoveryStore`; execution never invents
+a second persistence/recovery mechanism.
+
 ## MCP server boundary
 
 `acco.serve` is now a compatibility facade and composition root. The
@@ -797,6 +838,12 @@ behavior or duplicating repository logic.
     versions stay aligned, every shipped CLI command is present in the command
     reference, and relative links in the maintained public documentation set
     must resolve in CI.
+20. **Programmable execution stays bounded and single-sourced:** MCP/SDK adapters
+    delegate to `acco.execution`; only explicit repository-contained text inputs
+    are admitted, and oversized results require exact recovery before a lossy
+    preview may cross the model boundary. Execution is not represented as a
+    hardened hostile-code sandbox.
+
 
 `tests/test_architecture_boundaries.py`, `tests/test_hook_runtime.py`,
 `tests/test_mcp_server_boundaries.py`, `tests/test_repository_service.py`, and

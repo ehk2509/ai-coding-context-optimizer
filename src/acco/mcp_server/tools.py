@@ -6,6 +6,7 @@ from collections.abc import Iterable
 import base64
 from pathlib import Path
 
+from ..execution import ExecutionLimits, execute_program
 from ..output_saver import build_output_policy, compact_output
 from ..model_routing import (
     DEFAULT_ALLOWED_MODELS,
@@ -354,6 +355,23 @@ def _route_task(context: McpToolContext, arguments: dict) -> dict:
         calibration=calibration,
     ).to_dict()
 
+
+
+def _execute(context: McpToolContext, arguments: dict) -> dict:
+    """Run restricted local analysis over explicit repository text files."""
+    files = arguments.get("files")
+    if not isinstance(files, list):
+        raise ValueError("files must be an array of repository-relative paths")
+    return execute_program(
+        context.root,
+        str(arguments.get("code", "")),
+        [str(value) for value in files],
+        recovery=RecoveryStore(context.root),
+        limits=ExecutionLimits(
+            timeout_seconds=int(arguments.get("timeout_seconds", 5)),
+            max_result_bytes=int(arguments.get("max_result_bytes", 64 * 1024)),
+        ),
+    )
 
 
 def _output_policy(context: McpToolContext, arguments: dict) -> dict:
@@ -723,6 +741,48 @@ DEFAULT_TOOL_REGISTRY = McpToolRegistry(
             _route_task,
         ),
         McpToolSpec(
+            "execute",
+            (
+                "Run restricted Python analysis over explicitly selected repository "
+                "text files outside model context. Inputs are exposed as the data/files "
+                "mapping keyed by repository-relative path; assign the JSON-safe answer "
+                "to result. Imports, shell/process access, arbitrary file access, and "
+                "private/dunder traversal are blocked. Oversized results are exactly "
+                "recoverable."
+            ),
+            {
+                "type": "object",
+                "required": ["code", "files"],
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "maxLength": 16000,
+                        "description": (
+                            "Restricted Python program. Read selected text through "
+                            "data[path] or files[path] and assign the answer to result."
+                        ),
+                    },
+                    "files": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 128,
+                        "items": {"type": "string"},
+                    },
+                    "timeout_seconds": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 30,
+                    },
+                    "max_result_bytes": {
+                        "type": "integer",
+                        "minimum": 1024,
+                        "maximum": 1048576,
+                    },
+                },
+            },
+            _execute,
+        ),
+        McpToolSpec(
             "output_policy",
             "Return a generation-time response policy for reducing output tokens.",
             {
@@ -798,6 +858,7 @@ MCP_TOOL_PROFILES = {
         "memory_search",
         "memory_get",
         "remember_memory",
+        "execute",
     ),
     "memory": (
         "build_context",

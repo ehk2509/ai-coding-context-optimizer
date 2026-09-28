@@ -119,6 +119,59 @@ jobs:
           assert data["context_pack_tokens"] > 0
           PY
 
+          # Exercise the new frozen re-entry path end to end through MCP. This
+          # proves the one-file executable can spawn its private restricted
+          # execution worker without relying on an external Python interpreter.
+          python - <<'PY' > standalone-execute-input.jsonl
+          import json
+          messages = [
+              {
+                  "jsonrpc": "2.0",
+                  "id": 1,
+                  "method": "initialize",
+                  "params": {
+                      "protocolVersion": "2025-06-18",
+                      "capabilities": {},
+                      "clientInfo": {"name": "standalone-ci", "version": "1"},
+                  },
+              },
+              {"jsonrpc": "2.0", "method": "notifications/initialized"},
+              {
+                  "jsonrpc": "2.0",
+                  "id": 2,
+                  "method": "tools/call",
+                  "params": {
+                      "name": "execute",
+                      "arguments": {
+                          "files": ["pyproject.toml"],
+                          "code": (
+                              'lines = data["pyproject.toml"].splitlines()\n'
+                              'result = {"lines": len(lines)}'
+                          ),
+                      },
+                  },
+              },
+          ]
+          for message in messages:
+              print(json.dumps(message, separators=(",", ":")))
+          PY
+          "${{ matrix.binary }}" serve . < standalone-execute-input.jsonl > standalone-execute-output.jsonl
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          messages = [
+              json.loads(line)
+              for line in Path("standalone-execute-output.jsonl").read_text(
+                  encoding="utf-8"
+              ).splitlines()
+              if line.strip()
+          ]
+          response = next(message for message in messages if message.get("id") == 2)
+          payload = json.loads(response["result"]["content"][0]["text"])
+          assert payload["out_of_context"] is True
+          assert payload["result"]["lines"] > 0
+          PY
+
   windows-core:
     name: Windows core
     runs-on: windows-latest

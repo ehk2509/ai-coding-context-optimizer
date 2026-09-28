@@ -101,6 +101,21 @@ export interface DatabaseMiddleware {
   recover(handle: string): Promise<RecoveryResult>;
 }
 
+export interface ExecutionResult {
+  schema: number;
+  language: "restricted-python";
+  files: string[];
+  input_bytes: number;
+  result_bytes: number;
+  elapsed_ms: number;
+  timeout_seconds: number;
+  out_of_context: true;
+  truncated: boolean;
+  result: unknown | null;
+  preview?: string;
+  recovery_handle: string | null;
+}
+
 export interface RecoveryResult {
   schema: number;
   handle: string;
@@ -314,6 +329,18 @@ export class AccoClient {
     };
     if (columns !== null) payload.columns = columns;
     return this.request("POST", "/v1/middleware/database", payload);
+  }
+
+  execute(
+    code: string,
+    files: string[],
+    options: JsonObject = {},
+  ): Promise<ExecutionResult> {
+    return this.request("POST", "/v1/execute", {
+      code,
+      files,
+      options,
+    });
   }
 
   planContextBudget(

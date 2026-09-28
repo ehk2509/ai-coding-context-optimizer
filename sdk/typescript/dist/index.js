@@ -115,6 +115,14 @@ export class AccoClient {
     return this.request("POST", "/v1/middleware/database", payload);
   }
 
+  execute(code, files, options = {}) {
+    return this.request("POST", "/v1/execute", {
+      code,
+      files,
+      options,
+    });
+  }
+
   planContextBudget(prompt, totalTokens, options = {}) {
     return this.request("POST", "/v1/context-budget", {
       prompt,
