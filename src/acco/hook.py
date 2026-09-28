@@ -140,10 +140,16 @@ def _services() -> HookServices:
     )
 
 
-def _runtime(root: Path | None = None) -> HookRuntime:
-    """Build the Claude runtime from project config plus environment overrides."""
+def build_hook_runtime(root: Path | None = None) -> HookRuntime:
+    """Build the shared hook runtime from project config plus environment overrides."""
 
     return HookRuntime(_services(), _config_from_env(root))
+
+
+def _runtime(root: Path | None = None) -> HookRuntime:
+    """Preserve the historical private runtime-builder seam."""
+
+    return build_hook_runtime(root)
 
 
 def _payload_root(payload: dict) -> Path:
