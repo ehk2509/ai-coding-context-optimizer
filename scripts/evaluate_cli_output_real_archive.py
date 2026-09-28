@@ -115,7 +115,7 @@ def main() -> int:
                     "captured_cases": len(cases),
                     "claim_boundary": freeze["protocol"]["claim_boundary"],
                 },
-                "elyeshkiri": base._evaluate_local(cases),
+                "ehk2509": base._evaluate_local(cases),
             }
             if args.ppgranger_path:
                 report["ppgranger"] = base._evaluate_peer(
@@ -140,7 +140,7 @@ def main() -> int:
     else:
         sys.stdout.write(rendered)
 
-    local = report["elyeshkiri"]["summary"]
+    local = report["ehk2509"]["summary"]
     print(
         "fresh real corpus: "
         f"{local['cases']} cases, "
