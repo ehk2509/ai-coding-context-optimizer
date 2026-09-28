@@ -16,6 +16,7 @@ from .domain_middleware import (
     optimize_rag_context,
 )
 from .estimate import estimate_tokens
+from .execution import ExecutionLimits, execute_program
 from .model_routing import route_task
 from .output import OutputPolicy, OutputPipeline
 from .provider_transform import transform_provider_request
@@ -295,6 +296,26 @@ class AccoEngine:
             columns=columns,
             max_rows=max_rows,
             min_reduction=min_reduction,
+        )
+
+    def execute(
+        self,
+        code: str,
+        files: list[str] | tuple[str, ...],
+        *,
+        timeout_seconds: int = 5,
+        max_result_bytes: int = 64 * 1024,
+    ) -> dict[str, Any]:
+        """Run restricted analysis over repository files outside model context."""
+        return execute_program(
+            self.root,
+            code,
+            files,
+            recovery=self.recovery,
+            limits=ExecutionLimits(
+                timeout_seconds=timeout_seconds,
+                max_result_bytes=max_result_bytes,
+            ),
         )
 
     def recover(self, handle: str) -> dict[str, Any]:
