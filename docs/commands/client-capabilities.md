@@ -39,5 +39,11 @@ Run `acco client-capabilities --help` for the installed version.
 
 A `yes` for `pre_tool_intercept` or `session_hooks` means `acco setup`
 installs and verifies a native host hook surface rather than merely exposing MCP.
-Result-replacement guarantees remain host-specific: Gemini CLI and Copilot CLI
-can replace accepted successful tool results; Cursor is conditional because only MCP output has a documented replacement field; Qwen Code is reported as `no` for general successful-result replacement. Qwen prompt ingress is conditional because reliable user provenance depends on the optional `submitted_prompt` boundary.
+Result-replacement guarantees remain host-specific. Gemini CLI and Copilot CLI
+have direct replacement semantics. Codex is reported as conditional because
+ACCO installs project hooks that can suppress normal processing of local
+Bash/MCP results, but Codex remains responsible for trusting/enabling that hook
+definition. Cursor is conditional because only MCP output has a documented
+replacement field; Qwen Code is reported as `no` for general successful-result
+replacement. Qwen prompt ingress is conditional because reliable user
+provenance depends on the optional `submitted_prompt` boundary.
