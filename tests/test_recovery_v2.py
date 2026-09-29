@@ -86,3 +86,39 @@ def test_recovery_detects_tampered_exact_payload(tmp_path, monkeypatch):
 
     with pytest.raises(RecoveryIntegrityError, match="integrity"):
         store.get(handle)
+
+
+def test_existing_v1_recovery_database_migrates_without_losing_handle(
+    tmp_path, monkeypatch
+):
+    """Opening RecoveryStore v2 should preserve older exact recovery rows."""
+    root = _root(tmp_path, monkeypatch)
+    store = RecoveryStore(root)
+    store.path.parent.mkdir(parents=True, exist_ok=True)
+    payload = b"legacy exact bytes"
+    from acco.recovery import recovery_handle
+
+    handle = recovery_handle(payload)
+    with sqlite3.connect(store.path) as connection:
+        connection.execute(
+            """
+            CREATE TABLE recovery (
+                handle TEXT PRIMARY KEY,
+                content_type TEXT NOT NULL,
+                payload BLOB NOT NULL,
+                metadata_json TEXT NOT NULL,
+                created_at INTEGER NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            "INSERT INTO recovery VALUES (?, ?, ?, ?, ?)",
+            (handle, "text/plain", sqlite3.Binary(payload), "{}", 1),
+        )
+        connection.commit()
+
+    recovered = store.get(handle)
+
+    assert recovered.payload == payload
+    assert recovered.access_count == 1
+    assert store.info(handle)["digest"]
