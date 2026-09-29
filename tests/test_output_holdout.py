@@ -209,3 +209,23 @@ def test_disabled_or_ineligible_observation_is_not_measurement(tmp_path, monkeyp
     report = output_holdout_report(root, bootstrap_samples=20)
     assert report["measured_output_token_reduction"] is None
     assert report["strata"] == []
+
+
+def test_holdout_key_separates_same_surface_different_first_user():
+    """Identical system/tools must not collapse distinct conversations into one arm."""
+    profile = _profile()
+    base = {
+        "system": "shared instructions",
+        "tools": [{"name": "read"}],
+        "max_tokens": 3000,
+    }
+    one = {
+        **base,
+        "messages": [{"role": "user", "content": "fix auth"}],
+    }
+    two = {
+        **base,
+        "messages": [{"role": "user", "content": "fix billing"}],
+    }
+
+    assert holdout_epoch_key(one, profile) != holdout_epoch_key(two, profile)
