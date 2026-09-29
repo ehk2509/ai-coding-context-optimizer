@@ -46,13 +46,13 @@ def holdout_epoch_key(body: dict, profile: ProviderRequestProfile) -> str:
     explicit = None
     metadata = body.get("metadata")
     if isinstance(metadata, dict):
-        for key in ("conversation_id", "session_id", "thread_id"):
+        for key in ("conversation_id", "session_id", "thread_id", "conversation"):
             value = metadata.get(key)
             if isinstance(value, str) and value:
                 explicit = value
                 break
     if explicit is None:
-        for key in ("conversation_id", "session_id", "thread_id", "user"):
+        for key in ("conversation_id", "session_id", "thread_id", "conversation", "user"):
             value = body.get(key)
             if isinstance(value, str) and value:
                 explicit = value
@@ -69,16 +69,44 @@ def holdout_epoch_key(body: dict, profile: ProviderRequestProfile) -> str:
     else:
         if profile.provider == "gemini":
             contents = body.get("contents")
-            if isinstance(contents, list) and contents:
-                anchor["first_turn"] = contents[0]
+            if isinstance(contents, list):
+                first_user = next(
+                    (
+                        item
+                        for item in contents
+                        if isinstance(item, dict)
+                        and item.get("role") in {None, "user"}
+                    ),
+                    None,
+                )
+                if first_user is not None:
+                    anchor["first_turn"] = first_user
         else:
             messages = body.get("messages")
-            if isinstance(messages, list) and messages:
-                anchor["first_turn"] = messages[0]
-            else:
+            if isinstance(messages, list):
+                first_user = next(
+                    (
+                        item
+                        for item in messages
+                        if isinstance(item, dict) and item.get("role") == "user"
+                    ),
+                    None,
+                )
+                if first_user is not None:
+                    anchor["first_turn"] = first_user
+            if "first_turn" not in anchor:
                 input_items = body.get("input")
-                if isinstance(input_items, list) and input_items:
-                    anchor["first_turn"] = input_items[0]
+                if isinstance(input_items, list):
+                    first_user = next(
+                        (
+                            item
+                            for item in input_items
+                            if isinstance(item, dict) and item.get("role") == "user"
+                        ),
+                        input_items[0] if input_items else None,
+                    )
+                    if first_user is not None:
+                        anchor["first_turn"] = first_user
                 elif isinstance(input_items, str):
                     anchor["first_turn"] = input_items
     encoded = json.dumps(
