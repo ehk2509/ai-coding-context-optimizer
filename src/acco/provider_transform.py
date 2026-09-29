@@ -554,6 +554,7 @@ def transform_provider_request(
                 recovery=recovery,
                 min_tokens=effective_tool_result_min_tokens,
                 handles=handles,
+                tool_names=tool_names,
             )
             transformed_segments += _transform_openai_input(
                 transformed,
@@ -561,6 +562,7 @@ def transform_provider_request(
                 recovery=recovery,
                 min_tokens=effective_tool_result_min_tokens,
                 handles=handles,
+                tool_names=tool_names,
             )
             if profile.provider == "gemini":
                 transformed_segments += _transform_gemini(
