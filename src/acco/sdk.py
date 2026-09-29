@@ -176,7 +176,9 @@ class AccoEngine:
         original_tokens = estimate_tokens(text)
         candidate = result.text
         recovery_handle = None
-        if result.compressed and recoverable:
+        if result.requires_recovery and not recoverable:
+            candidate = text
+        elif result.compressed and recoverable:
             try:
                 recovery_handle = self.recovery.put(
                     text,
@@ -184,6 +186,8 @@ class AccoEngine:
                     metadata={
                         "transform": "sdk-output",
                         "processor": result.processor,
+                        "content_kind": result.content_kind,
+                        "safety_class": result.safety_class.name,
                     },
                 )
             except RecoveryCapacityError:
@@ -195,6 +199,10 @@ class AccoEngine:
             "schema": 1,
             "text": candidate,
             "processor": result.processor,
+            "content_kind": result.content_kind,
+            "safety_class": result.safety_class.name,
+            "validation": result.validation,
+            "requires_recovery": result.safety_class.requires_recovery,
             "changed": changed,
             "compressed": changed,
             "failed": result.failed,
