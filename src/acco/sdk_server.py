@@ -182,6 +182,52 @@ class SdkApplication:
                 **self._options(body),
             )
 
+        if path == "/v1/execute-file":
+            program_file = body.get("program_file")
+            files = body.get("files")
+            if not isinstance(program_file, str):
+                raise ValueError("program_file must be a string")
+            if not isinstance(files, list):
+                raise ValueError("files must be a JSON array")
+            return 200, self.engine.execute_file(
+                program_file,
+                [str(value) for value in files],
+                **self._options(body),
+            )
+
+        if path == "/v1/batch-execute":
+            jobs = body.get("jobs")
+            if not isinstance(jobs, list):
+                raise ValueError("jobs must be a JSON array")
+            return 200, self.engine.batch_execute(
+                jobs,
+                **self._options(body),
+            )
+
+        if path == "/v1/session/search":
+            query = body.get("query")
+            if not isinstance(query, str):
+                raise ValueError("query must be a string")
+            kinds = body.get("kinds")
+            if kinds is not None and not isinstance(kinds, list):
+                raise ValueError("kinds must be a JSON array")
+            return 200, self.engine.session_search(
+                query,
+                kinds=[str(value) for value in kinds] if isinstance(kinds, list) else None,
+                session=str(body["session"]) if body.get("session") else None,
+                limit=int(body.get("limit", 12)),
+            )
+
+        if path == "/v1/session/recent":
+            kinds = body.get("kinds")
+            if kinds is not None and not isinstance(kinds, list):
+                raise ValueError("kinds must be a JSON array")
+            return 200, self.engine.session_recent(
+                kinds=[str(value) for value in kinds] if isinstance(kinds, list) else None,
+                session=str(body["session"]) if body.get("session") else None,
+                limit=int(body.get("limit", 12)),
+            )
+
         if path == "/v1/context-budget":
             prompt = body.get("prompt")
             if not isinstance(prompt, str):
