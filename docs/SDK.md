@@ -47,6 +47,13 @@ acco.optimize_browser_context(
 acco.optimize_output(stdout, command="pytest -q", exit_code=1)
 acco.route_model(prompt, current_model="claude-sonnet-5")
 acco.execute('result = len(data["build.log"].splitlines())', ["build.log"])
+acco.execute_file("tools/analyze_build.py", ["build.log"])
+acco.batch_execute([
+    {"id": "logs", "code_file": "tools/analyze_build.py", "files": ["build.log"]},
+    {"id": "tests", "code": 'result = len(data["junit.txt"].splitlines())', "files": ["junit.txt"]},
+])
+acco.session_search("why did we choose SQLite?")
+acco.session_recent(limit=10)
 acco.recover("tsr_...")
 ```
 
@@ -198,6 +205,74 @@ const analysis = await acco.execute(
 MCP exposes the same operation as `execute`; adaptive tool discovery selects it
 for tasks involving large logs/JSON, aggregation, scans, statistics, or batch
 analysis.
+
+### Reusable programs and bounded batches
+
+For recurring analyses, keep the restricted program in the repository and pass
+only its path:
+
+```python
+analysis = acco.execute_file(
+    "tools/analyze_failures.py",
+    ["artifacts/test.log", "artifacts/results.json"],
+)
+```
+
+For independent analyses that would otherwise require several model/tool turns,
+run a bounded batch:
+
+```python
+batch = acco.batch_execute([
+    {
+        "id": "failures",
+        "code_file": "tools/analyze_failures.py",
+        "files": ["artifacts/test.log"],
+    },
+    {
+        "id": "sizes",
+        "code": 'result = {p: len(v) for p, v in data.items()}',
+        "files": ["a.json", "b.json"],
+    },
+])
+```
+
+A batch accepts at most eight jobs, preflights every program/path before running,
+caps aggregate input at 64 MiB, and stops starting new jobs after the 60-second
+batch envelope. Each job keeps the ordinary per-process 1–30 second limit. If
+the aggregate JSON result is too large, the whole exact batch result is stored
+behind one recovery handle.
+
+TypeScript exposes `executeFile(...)` and `batchExecute(...)` over the same
+Python engine.
+
+## Searchable session ledger
+
+ACCO's continuity snapshot remains deliberately tiny. A separate private
+per-project SQLite ledger now records searchable structured work events:
+
+- session starts and compaction checkpoints;
+- explicit user decision/preference sentences after credential redaction;
+- file Read/Edit/Write activity;
+- redacted shell command labels;
+- failures and recognized validation outcomes.
+
+It does **not** persist raw prompts or raw tool output. The event summary/index is
+bounded, and SQLite FTS5 is used when available:
+
+```python
+history = acco.session_search(
+    "SQLite persistence decision",
+    kinds=["decision", "validation"],
+    limit=12,
+)
+
+recent = acco.session_recent(limit=10)
+```
+
+TypeScript exposes `sessionSearch(...)` and `sessionRecent(...)`. MCP exposes
+the equivalent `session_search` and `session_recent` tools. Resume/compaction
+continuity can append a small recent-event packet automatically, while deeper
+history stays out of context until explicitly searched.
 
 ## Whole-context planning
 

@@ -26,6 +26,8 @@ TOOL_GROUPS = {
         "recall_findings",
         "remember_finding",
         "knowledge_status",
+        "session_search",
+        "session_recent",
     ),
     "recovery": (
         "recover_context",
@@ -55,6 +57,8 @@ TOOL_GROUPS = {
     ),
     "execution": (
         "execute",
+        "execute_file",
+        "batch_execute",
     ),
 }
 
@@ -62,7 +66,7 @@ _GROUP_TERMS = {
     "memory": {
         "memory", "remember", "recall", "previous", "prior", "decision",
         "convention", "guardrail", "architecture", "bugfix", "history",
-        "session", "knowledge",
+        "session", "knowledge", "ledger", "timeline", "resume",
     },
     "recovery": {
         "recover", "recovery", "original", "exact", "bytes", "tsr",

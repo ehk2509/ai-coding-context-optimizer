@@ -41,6 +41,28 @@ ACCO makes no universal token, API-cost, or cost-per-success claim beyond that
 scoped result; see [Validation evidence](VALIDATION.md) and
 [Benchmarking methodology](BENCHMARKING.md).
 
+## Current main: deeper execution + searchable session history
+
+The next development line extends two 1.23 capabilities without weakening their
+boundaries:
+
+- **Reusable and batched out-of-context compute.** MCP/SDK clients can now use
+  `execute`, `execute_file`, or `batch_execute`. Reusable restricted Python
+  programs can live in the repository, and a batch can run up to eight bounded
+  jobs under one aggregate input/time/result envelope. Large aggregate results
+  remain exactly recoverable rather than being silently truncated.
+- **Event-backed session ledger.** ACCO now records redacted structured working
+  events—session starts, explicit user decisions/preferences, file activity,
+  commands, failures, validations, and compaction checkpoints—in a private
+  per-project SQLite ledger. FTS5 search is used when available with a bounded
+  LIKE fallback. Resume context can draw on recent ledger state, while MCP/SDK
+  callers can query older history through `session_search` / `session_recent`.
+  Raw prompts and raw tool outputs are not stored in this ledger.
+
+This remains separate from durable project knowledge: the ledger records what
+happened during work, while finding/memory stores represent conclusions the
+agent explicitly chose to preserve.
+
 ## Install
 
 ### Fast path

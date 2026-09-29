@@ -40,11 +40,38 @@ host's repository-trust controls where available. ACCO's ownership checks preven
 it from silently taking over unrelated hook entries; they do not make arbitrary
 third-party hooks safe.
 
+## Searchable session ledger
+
+ACCO can persist a private project-scoped SQLite event ledger under
+`ACCO_STATE_DIR/session-ledger`. It is designed to preserve useful working
+history without becoming another transcript store.
+
+The ledger stores bounded structured summaries such as:
+
+- session lifecycle and compaction checkpoints;
+- file paths/actions;
+- redacted shell command labels and validation status;
+- failure digests/status;
+- narrowly extracted explicit user decision/preference sentences.
+
+It does **not** store full prompt text or raw tool output. Decision snippets are
+credential-redacted and length-bounded, but they can still contain ordinary
+project/user text. Treat the ledger as sensitive local agent state. The database
+uses private permissions where supported and sits inside a private state
+directory; it is not encrypted at rest.
+
+FTS5 is used only as a local index over the stored bounded summary/subject/path
+fields. Minimal SQLite builds fall back to bounded LIKE search. The ledger is
+capped to the newest 20,000 events per project.
+
 ## Out-of-context programmable execution
 
-The MCP `execute` tool and SDK `execute` method are designed for local
-aggregation/filtering over large repository text without first placing the
-source bytes in model context.
+The MCP/SDK `execute`, `execute_file`, and `batch_execute` surfaces are
+designed for local aggregation/filtering over large repository text without
+first placing the source bytes in model context. `execute_file` loads the
+restricted program from inside the repository; `batch_execute` preflights up
+to eight jobs, caps aggregate input at 64 MiB, and retains the same per-job
+restricted interpreter.
 
 The execution engine:
 

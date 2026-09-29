@@ -11,6 +11,8 @@ from acco.execution import (
     ExecutionLimits,
     ExecutionValidationError,
     _worker_command,
+    batch_execute,
+    execute_file,
     execute_program,
 )
 from acco.recovery import RecoveryStore
@@ -176,3 +178,107 @@ def test_oversized_execution_result_is_exactly_recoverable(tmp_path, monkeypatch
     assert payload["rows"][0] == "value-0"
     assert payload["rows"][-1] == "value-999"
     assert recovered.metadata["transform"] == "out-of-context-execution-result"
+
+
+def test_execute_file_runs_repository_contained_program(tmp_path, monkeypatch):
+    """Reusable analysis scripts should execute without putting their source in context."""
+    root = _repo(tmp_path, monkeypatch)
+    (root / "values.txt").write_text("2\n3\n5\n", encoding="utf-8")
+    (root / "analyze.py").write_text(
+        'values = [int(v) for v in data["values.txt"].splitlines()]\n'
+        'result = {"sum": sum(values), "max": max(values)}\n',
+        encoding="utf-8",
+    )
+
+    result = execute_file(
+        root,
+        "analyze.py",
+        ["values.txt"],
+    )
+
+    assert result["program_file"] == "analyze.py"
+    assert result["result"] == {"sum": 10, "max": 5}
+    assert result["out_of_context"] is True
+
+
+def test_batch_execute_supports_inline_and_file_programs(tmp_path, monkeypatch):
+    """One bounded batch should support reusable and one-off analyses."""
+    root = _repo(tmp_path, monkeypatch)
+    (root / "a.txt").write_text("one\ntwo\nthree\n", encoding="utf-8")
+    (root / "count.py").write_text(
+        'result = len(data["a.txt"].splitlines())\n',
+        encoding="utf-8",
+    )
+
+    result = batch_execute(
+        root,
+        [
+            {
+                "id": "lines",
+                "code_file": "count.py",
+                "files": ["a.txt"],
+            },
+            {
+                "id": "chars",
+                "code": 'result = len(data["a.txt"])',
+                "files": ["a.txt"],
+            },
+        ],
+    )
+
+    assert result["job_count"] == 2
+    assert result["truncated"] is False
+    assert result["results"][0]["id"] == "lines"
+    assert result["results"][0]["program_file"] == "count.py"
+    assert result["results"][0]["result"] == 3
+    expected_text = (root / "a.txt").read_bytes().decode("utf-8")
+    assert result["results"][1]["result"] == len(expected_text)
+
+
+def test_batch_execute_rejects_ambiguous_program_source(tmp_path, monkeypatch):
+    """A batch job must choose inline code or a program file, never both."""
+    root = _repo(tmp_path, monkeypatch)
+    (root / "a.txt").write_text("x", encoding="utf-8")
+    (root / "a.py").write_text("result = 1\n", encoding="utf-8")
+
+    with pytest.raises(ExecutionValidationError, match="exactly one"):
+        batch_execute(
+            root,
+            [
+                {
+                    "code": "result = 1",
+                    "code_file": "a.py",
+                    "files": ["a.txt"],
+                }
+            ],
+        )
+
+
+def test_batch_execute_oversized_aggregate_is_exactly_recoverable(
+    tmp_path, monkeypatch
+):
+    """The batch envelope must remain recoverable when combined results are large."""
+    root = _repo(tmp_path, monkeypatch)
+    (root / "a.txt").write_text("x", encoding="utf-8")
+    store = RecoveryStore(root)
+
+    result = batch_execute(
+        root,
+        [
+            {
+                "id": "large",
+                "code": 'result = ["row-" + str(i) for i in range(1000)]',
+                "files": ["a.txt"],
+            }
+        ],
+        recovery=store,
+        limits=ExecutionLimits(max_result_bytes=1024),
+    )
+
+    assert result["truncated"] is True
+    assert result["results"] is None
+    recovered = store.get(result["recovery_handle"])
+    payload = json.loads(recovered.payload.decode("utf-8"))
+    assert payload[0]["id"] == "large"
+    assert payload[0]["result"][0] == "row-0"
+    assert payload[0]["result"][-1] == "row-999"

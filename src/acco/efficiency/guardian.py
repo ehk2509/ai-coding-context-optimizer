@@ -6,6 +6,7 @@ import hashlib
 from pathlib import Path
 import time
 
+from .ledger import append_ledger_event
 from .store import append_event, load_snapshot, update_snapshot
 
 MAX_FILES = 10
@@ -74,6 +75,19 @@ def capture_guardian(
             "session": key,
             "source": source,
         },
+    )
+    append_ledger_event(
+        root,
+        kind="checkpoint",
+        session=key,
+        subject=source,
+        summary=(
+            f"pre-compaction checkpoint task={checkpoint['task']} "
+            f"files={len(checkpoint['working_files'])} "
+            f"commands={len(checkpoint['commands'])} "
+            f"failures={len(checkpoint['failures'])}"
+        ),
+        status="captured",
     )
     return checkpoint
 

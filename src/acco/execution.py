@@ -32,6 +32,9 @@ MAX_RESULT_BYTES = 1024 * 1024
 MAX_CODE_CHARS = 16_000
 MAX_FILES = 128
 MAX_INPUT_BYTES = 32 * 1024 * 1024
+MAX_BATCH_JOBS = 8
+MAX_BATCH_INPUT_BYTES = 64 * 1024 * 1024
+MAX_BATCH_SECONDS = 60
 _PREVIEW_CHARS = 12_000
 
 _FORBIDDEN_NAMES = {
@@ -345,6 +348,187 @@ def _preview(serialized: str) -> str:
         + f"\n... [ACCO omitted {omitted} result characters; recover exact result] ...\n"
         + serialized[-half:]
     )
+
+
+def _program_from_file(
+    root: Path,
+    program_file: str,
+    *,
+    max_code_chars: int,
+) -> tuple[str, str]:
+    """Load one repository-contained restricted Python program."""
+    key, raw = _resolve_input(root, program_file)
+    code = raw.decode("utf-8", errors="strict")
+    validate_program(code, max_code_chars=max_code_chars)
+    return key, code
+
+
+def execute_file(
+    root: str | Path,
+    program_file: str,
+    files: list[str] | tuple[str, ...],
+    *,
+    recovery: RecoveryStore | None = None,
+    limits: ExecutionLimits | None = None,
+) -> dict[str, Any]:
+    """Execute a repository-contained restricted program over explicit text inputs."""
+    repository = Path(root).expanduser().resolve()
+    if not repository.is_dir():
+        raise ValueError(f"execution root must be an existing directory: {repository}")
+    normalized_limits = (limits or ExecutionLimits()).validate()
+    program_key, code = _program_from_file(
+        repository,
+        program_file,
+        max_code_chars=normalized_limits.max_code_chars,
+    )
+    result = execute_program(
+        repository,
+        code,
+        files,
+        recovery=recovery,
+        limits=normalized_limits,
+    )
+    return {**result, "program_file": program_key}
+
+
+def batch_execute(
+    root: str | Path,
+    jobs: list[dict[str, Any]] | tuple[dict[str, Any], ...],
+    *,
+    recovery: RecoveryStore | None = None,
+    limits: ExecutionLimits | None = None,
+) -> dict[str, Any]:
+    """Execute a bounded sequence of restricted analysis jobs out of context."""
+    repository = Path(root).expanduser().resolve()
+    if not repository.is_dir():
+        raise ValueError(f"execution root must be an existing directory: {repository}")
+    if not isinstance(jobs, (list, tuple)) or not jobs:
+        raise ExecutionValidationError("jobs must contain at least one execution job")
+    if len(jobs) > MAX_BATCH_JOBS:
+        raise ExecutionValidationError(
+            f"batch execution supports at most {MAX_BATCH_JOBS} jobs"
+        )
+    normalized_limits = (limits or ExecutionLimits()).validate()
+    prepared: list[tuple[str, str, list[str], str | None]] = []
+    total_input_bytes = 0
+
+    for index, raw_job in enumerate(jobs):
+        if not isinstance(raw_job, dict):
+            raise ExecutionValidationError(f"batch job {index} must be an object")
+        raw_files = raw_job.get("files")
+        if not isinstance(raw_files, list) or not raw_files:
+            raise ExecutionValidationError(
+                f"batch job {index} files must be a nonempty array"
+            )
+        files = [str(value) for value in raw_files]
+        code = raw_job.get("code")
+        code_file = raw_job.get("code_file")
+        if bool(isinstance(code, str) and code.strip()) == bool(
+            isinstance(code_file, str) and code_file.strip()
+        ):
+            raise ExecutionValidationError(
+                f"batch job {index} must provide exactly one of code or code_file"
+            )
+        program_file: str | None = None
+        if isinstance(code_file, str) and code_file.strip():
+            program_file, prepared_code = _program_from_file(
+                repository,
+                code_file,
+                max_code_chars=normalized_limits.max_code_chars,
+            )
+        else:
+            prepared_code = str(code)
+            validate_program(
+                prepared_code,
+                max_code_chars=normalized_limits.max_code_chars,
+            )
+        _loaded, input_bytes = _load_inputs(repository, files, normalized_limits)
+        total_input_bytes += input_bytes
+        if total_input_bytes > MAX_BATCH_INPUT_BYTES:
+            raise ExecutionValidationError(
+                f"batch inputs exceed {MAX_BATCH_INPUT_BYTES} bytes"
+            )
+        job_id = str(raw_job.get("id") or index)
+        prepared.append((job_id, prepared_code, files, program_file))
+
+    # The caller's max_result_bytes governs the combined model-visible batch
+    # envelope. Individual jobs may use the engine hard maximum so a moderately
+    # large result is not truncated before the batch can store the exact
+    # aggregate behind one recovery handle.
+    job_limits = ExecutionLimits(
+        timeout_seconds=normalized_limits.timeout_seconds,
+        max_result_bytes=MAX_RESULT_BYTES,
+        max_files=normalized_limits.max_files,
+        max_input_bytes=normalized_limits.max_input_bytes,
+        max_code_chars=normalized_limits.max_code_chars,
+    ).validate()
+    store = recovery or RecoveryStore(repository)
+    started = time.monotonic()
+    results: list[dict[str, Any]] = []
+    for job_id, code, files, program_file in prepared:
+        if time.monotonic() - started >= MAX_BATCH_SECONDS:
+            raise TimeoutError(
+                f"ACCO batch execution exceeded {MAX_BATCH_SECONDS}s before "
+                f"starting job {job_id}"
+            )
+        result = execute_program(
+            repository,
+            code,
+            files,
+            recovery=store,
+            limits=job_limits,
+        )
+        if program_file:
+            result["program_file"] = program_file
+        results.append({"id": job_id, **result})
+
+    elapsed_ms = int((time.monotonic() - started) * 1000)
+    serialized = json.dumps(
+        results,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    result_bytes = len(serialized.encode("utf-8"))
+    common = {
+        "schema": 1,
+        "language": "restricted-python",
+        "job_count": len(results),
+        "input_bytes": total_input_bytes,
+        "result_bytes": result_bytes,
+        "elapsed_ms": elapsed_ms,
+        "out_of_context": True,
+    }
+    if result_bytes <= normalized_limits.max_result_bytes:
+        return {
+            **common,
+            "truncated": False,
+            "results": results,
+            "recovery_handle": None,
+        }
+    try:
+        handle = store.put(
+            serialized.encode("utf-8"),
+            content_type="application/json",
+            metadata={
+                "transform": "out-of-context-batch-result",
+                "language": "restricted-python",
+                "job_count": len(results),
+                "result_bytes": result_bytes,
+            },
+        )
+    except RecoveryCapacityError:
+        raise RecoveryCapacityError(
+            "batch execution result exceeds the response limit and exact "
+            "recovery capacity is unavailable; no lossy result was returned"
+        ) from None
+    return {
+        **common,
+        "truncated": True,
+        "results": None,
+        "preview": _preview(serialized),
+        "recovery_handle": handle,
+    }
 
 
 def execute_program(

@@ -10,6 +10,7 @@ import time
 
 from ..estimate import estimate_tokens
 from ..generation_policy import classify_output_task
+from .ledger import append_ledger_event, decision_summaries, resume_ledger_context
 from .store import append_event, load_snapshot, update_snapshot
 
 MAX_SESSIONS = 8
@@ -146,6 +147,14 @@ def start_session(
         session["last_activity"] = int(time.time())
 
     update_snapshot(root, mutate)
+    append_ledger_event(
+        root,
+        kind="session",
+        session=key,
+        subject=source or "startup",
+        summary=f"session start source={source or 'startup'}",
+        status="started",
+    )
 
 
 def observe_prompt(
@@ -160,11 +169,14 @@ def observe_prompt(
         return
     key = _session_key(session_id)
     task = classify_output_task(prompt) or None
+    turn = 0
 
     def mutate(payload: dict) -> None:
         """Reset per-turn behavioral counters and retain task class only."""
+        nonlocal turn
         session = _session(payload, key)
         session["turn"] = int(session.get("turn", 0)) + 1
+        turn = int(session["turn"])
         session["tool_count_turn"] = 0
         session["edits_turn"] = 0
         session["signals_emitted"] = []
@@ -173,6 +185,23 @@ def observe_prompt(
         session["last_activity"] = int(time.time())
 
     update_snapshot(root, mutate)
+    append_ledger_event(
+        root,
+        kind="prompt",
+        session=key,
+        turn=turn,
+        subject=task or "general",
+        summary=f"turn {turn} task={task or 'general'}",
+    )
+    for decision in decision_summaries(prompt):
+        append_ledger_event(
+            root,
+            kind="decision",
+            session=key,
+            turn=turn,
+            subject="user-decision",
+            summary=decision,
+        )
 
 
 def deduplicate_output(
@@ -320,11 +349,15 @@ def observe_tool(
     original_tokens = estimate_tokens(original_text) if original_text else 0
     delivered_tokens = estimate_tokens(delivered_text) if delivered_text else 0
     note: str | None = None
+    current_turn = 0
+    validation_kind: str | None = None
+    command_label = ""
 
     def mutate(snapshot: dict) -> None:
         """Record one tool event and detect bounded repetitive behavior."""
-        nonlocal note
+        nonlocal note, current_turn, validation_kind, command_label
         session = _session(snapshot, key)
+        current_turn = int(session.get("turn", 0))
         session["tool_count_turn"] = int(session.get("tool_count_turn", 0)) + 1
         session["last_activity"] = int(time.time())
 
@@ -341,6 +374,7 @@ def observe_tool(
 
         if command:
             label = _safe_command_label(command)
+            command_label = label
             command_id = _command_hash(command)
             output_id = _output_hash(original_text) if original_text else None
             commands = session.setdefault("commands", [])
@@ -369,6 +403,7 @@ def observe_tool(
                     MAX_FAILURES,
                 )
             validation = _validation_kind(command)
+            validation_kind = validation
             if validation:
                 validations = session.setdefault("validations", [])
                 _bounded_append(
@@ -444,6 +479,54 @@ def observe_tool(
 
     update_snapshot(root, mutate)
 
+    if path and tool in {"Read", "Edit", "Write"}:
+        append_ledger_event(
+            root,
+            kind="file",
+            session=key,
+            turn=current_turn,
+            subject=tool.lower(),
+            path=path,
+            status="failed" if failed else "ok",
+            summary=f"{tool.lower()} {path}",
+            metadata={"tool": tool},
+        )
+    if command and command_label:
+        append_ledger_event(
+            root,
+            kind="command",
+            session=key,
+            turn=current_turn,
+            subject="bash",
+            status="failed" if failed else "passed",
+            summary=command_label,
+            metadata={
+                "output_digest": _output_hash(original_text) if original_text else "",
+                "original_tokens": original_tokens,
+                "delivered_tokens": delivered_tokens,
+            },
+        )
+        if failed:
+            append_ledger_event(
+                root,
+                kind="failure",
+                session=key,
+                turn=current_turn,
+                subject="command",
+                status="failed",
+                summary=command_label,
+            )
+        if validation_kind:
+            append_ledger_event(
+                root,
+                kind="validation",
+                session=key,
+                turn=current_turn,
+                subject=validation_kind,
+                status="failed" if failed else "passed",
+                summary=f"{validation_kind}: {command_label}",
+            )
+
     if original_tokens > delivered_tokens:
         feature = (
             "cross_turn_dedup"
@@ -484,8 +567,13 @@ def continuity_context(
         source=source,
         enabled=enabled,
     )
+    ledger = resume_ledger_context(
+        root,
+        session=_session_key(session_id),
+        limit=8,
+    )
     if guarded:
-        return guarded
+        return guarded + ("\n\n" + ledger if ledger else "")
     snapshot = load_snapshot(root)
     sessions = snapshot.get("sessions")
     if not isinstance(sessions, dict) or not sessions:
@@ -545,4 +633,5 @@ def continuity_context(
             "session": key,
         },
     )
-    return "\n".join(lines)
+    rendered = "\n".join(lines)
+    return rendered + ("\n\n" + ledger if ledger else "")

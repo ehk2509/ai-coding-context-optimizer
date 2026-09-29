@@ -381,3 +381,79 @@ test("typed client exposes out-of-context execution", async () => {
     assert.equal(result.result.errors, 12);
   });
 });
+
+
+test("typed client exposes execute-file batch and session-ledger APIs", async () => {
+  const seen = [];
+  await withServer(async (req, res) => {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    seen.push({ path: req.url, body });
+    res.writeHead(200, { "content-type": "application/json" });
+    if (req.url === "/v1/execute-file") {
+      res.end(JSON.stringify({
+        schema: 1,
+        language: "restricted-python",
+        files: body.files,
+        program_file: body.program_file,
+        input_bytes: 10,
+        result_bytes: 1,
+        elapsed_ms: 1,
+        timeout_seconds: 5,
+        out_of_context: true,
+        truncated: false,
+        result: 3,
+        recovery_handle: null,
+      }));
+    } else if (req.url === "/v1/batch-execute") {
+      res.end(JSON.stringify({
+        schema: 1,
+        language: "restricted-python",
+        job_count: body.jobs.length,
+        input_bytes: 10,
+        result_bytes: 10,
+        elapsed_ms: 2,
+        out_of_context: true,
+        truncated: false,
+        results: [{ id: "sum", result: 6 }],
+        recovery_handle: null,
+      }));
+    } else {
+      res.end(JSON.stringify({
+        schema: 1,
+        query: body.query,
+        mode: "fts5",
+        count: 1,
+        events: [{
+          id: 1,
+          recorded_at: 1,
+          session: "s1",
+          turn: 1,
+          kind: "decision",
+          subject: "user-decision",
+          summary: "Prefer SQLite.",
+          path: null,
+          status: null,
+          metadata: {},
+        }],
+      }));
+    }
+  }, async (baseUrl) => {
+    const client = new AccoClient({ baseUrl });
+    const file = await client.executeFile("count.py", ["values.txt"]);
+    const batch = await client.batchExecute([
+      { id: "sum", code: "result = 6", files: ["values.txt"] },
+    ]);
+    const history = await client.sessionSearch("SQLite");
+
+    assert.equal(file.program_file, "count.py");
+    assert.equal(batch.job_count, 1);
+    assert.equal(history.events[0].kind, "decision");
+  });
+
+  assert.deepEqual(
+    seen.map((item) => item.path),
+    ["/v1/execute-file", "/v1/batch-execute", "/v1/session/search"],
+  );
+});

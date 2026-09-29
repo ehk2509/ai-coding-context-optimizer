@@ -6,7 +6,8 @@ from collections.abc import Iterable
 import base64
 from pathlib import Path
 
-from ..execution import ExecutionLimits, execute_program
+from ..efficiency.ledger import recent_ledger_events, search_ledger
+from ..execution import ExecutionLimits, batch_execute, execute_file, execute_program
 from ..output_saver import build_output_policy, compact_output
 from ..model_routing import (
     DEFAULT_ALLOWED_MODELS,
@@ -372,6 +373,63 @@ def _execute(context: McpToolContext, arguments: dict) -> dict:
             max_result_bytes=int(arguments.get("max_result_bytes", 64 * 1024)),
         ),
     )
+
+
+def _execute_file(context: McpToolContext, arguments: dict) -> dict:
+    """Run a repository-contained restricted analysis program."""
+    files = arguments.get("files")
+    if not isinstance(files, list):
+        raise ValueError("files must be an array of repository-relative paths")
+    return execute_file(
+        context.root,
+        str(arguments.get("program_file", "")),
+        [str(value) for value in files],
+        recovery=RecoveryStore(context.root),
+        limits=ExecutionLimits(
+            timeout_seconds=int(arguments.get("timeout_seconds", 5)),
+            max_result_bytes=int(arguments.get("max_result_bytes", 64 * 1024)),
+        ),
+    )
+
+
+def _batch_execute(context: McpToolContext, arguments: dict) -> dict:
+    """Run multiple restricted analysis jobs under one bounded batch."""
+    jobs = arguments.get("jobs")
+    if not isinstance(jobs, list):
+        raise ValueError("jobs must be an array")
+    return batch_execute(
+        context.root,
+        jobs,
+        recovery=RecoveryStore(context.root),
+        limits=ExecutionLimits(
+            timeout_seconds=int(arguments.get("timeout_seconds", 5)),
+            max_result_bytes=int(arguments.get("max_result_bytes", 64 * 1024)),
+        ),
+    )
+
+
+def _session_search(context: McpToolContext, arguments: dict) -> dict:
+    """Search persisted structured session history."""
+    kinds = arguments.get("kinds")
+    return search_ledger(
+        context.root,
+        str(arguments.get("query", "")),
+        kinds=[str(value) for value in kinds] if isinstance(kinds, list) else None,
+        session=str(arguments["session"]) if arguments.get("session") else None,
+        limit=int(arguments.get("limit", 12)),
+    )
+
+
+def _session_recent(context: McpToolContext, arguments: dict) -> dict:
+    """Return recent structured session events without transcript content."""
+    kinds = arguments.get("kinds")
+    events = recent_ledger_events(
+        context.root,
+        session=str(arguments["session"]) if arguments.get("session") else None,
+        kinds=[str(value) for value in kinds] if isinstance(kinds, list) else None,
+        limit=int(arguments.get("limit", 12)),
+    )
+    return {"schema": 1, "count": len(events), "events": events}
 
 
 def _output_policy(context: McpToolContext, arguments: dict) -> dict:
@@ -783,6 +841,99 @@ DEFAULT_TOOL_REGISTRY = McpToolRegistry(
             _execute,
         ),
         McpToolSpec(
+            "execute_file",
+            (
+                "Run a repository-contained restricted Python program over explicit "
+                "repository text inputs outside model context."
+            ),
+            {
+                "type": "object",
+                "required": ["program_file", "files"],
+                "properties": {
+                    "program_file": {"type": "string"},
+                    "files": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 128,
+                        "items": {"type": "string"},
+                    },
+                    "timeout_seconds": {"type": "integer", "minimum": 1, "maximum": 30},
+                    "max_result_bytes": {"type": "integer", "minimum": 1024, "maximum": 1048576},
+                },
+            },
+            _execute_file,
+        ),
+        McpToolSpec(
+            "batch_execute",
+            (
+                "Run up to eight restricted out-of-context analysis jobs. Each job "
+                "provides exactly one of code/code_file plus explicit text files."
+            ),
+            {
+                "type": "object",
+                "required": ["jobs"],
+                "properties": {
+                    "jobs": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 8,
+                        "items": {
+                            "type": "object",
+                            "required": ["files"],
+                            "properties": {
+                                "id": {"type": "string"},
+                                "code": {"type": "string"},
+                                "code_file": {"type": "string"},
+                                "files": {
+                                    "type": "array",
+                                    "minItems": 1,
+                                    "maxItems": 128,
+                                    "items": {"type": "string"},
+                                },
+                            },
+                        },
+                    },
+                    "timeout_seconds": {"type": "integer", "minimum": 1, "maximum": 30},
+                    "max_result_bytes": {"type": "integer", "minimum": 1024, "maximum": 1048576},
+                },
+            },
+            _batch_execute,
+        ),
+        McpToolSpec(
+            "session_search",
+            "Search redacted structured session history with local FTS5 when available.",
+            {
+                "type": "object",
+                "required": ["query"],
+                "properties": {
+                    "query": {"type": "string"},
+                    "kinds": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    },
+                    "session": {"type": "string"},
+                    "limit": {"type": "integer", "minimum": 1, "maximum": 50},
+                },
+            },
+            _session_search,
+        ),
+        McpToolSpec(
+            "session_recent",
+            "Return recent structured session events without raw prompt/tool-output text.",
+            {
+                "type": "object",
+                "properties": {
+                    "kinds": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    },
+                    "session": {"type": "string"},
+                    "limit": {"type": "integer", "minimum": 1, "maximum": 50},
+                },
+            },
+            _session_recent,
+        ),
+        McpToolSpec(
             "output_policy",
             "Return a generation-time response policy for reducing output tokens.",
             {
@@ -858,7 +1009,11 @@ MCP_TOOL_PROFILES = {
         "memory_search",
         "memory_get",
         "remember_memory",
+        "session_search",
+        "session_recent",
         "execute",
+        "execute_file",
+        "batch_execute",
     ),
     "memory": (
         "build_context",
@@ -868,6 +1023,8 @@ MCP_TOOL_PROFILES = {
         "memory_get",
         "remember_memory",
         "knowledge_status",
+        "session_search",
+        "session_recent",
     ),
     "adaptive": ADAPTIVE_CORE,
 }
