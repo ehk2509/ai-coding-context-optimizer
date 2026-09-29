@@ -99,6 +99,71 @@ Every mutation is journaled with an exact recovery backup and is evaluated
 against later provider-reported token evidence before it can be retained as a
 measured local improvement.
 
+## Runtime compression/cache v2 boundaries
+
+Five newer surfaces keep their responsibilities separated rather than creating a
+second orchestration stack:
+
+```text
+native host hook
+  -> private project-local native runtime
+      -> shared HookRuntime
+
+OutputPipeline
+  -> content detection
+  -> format invariant gate
+  -> S0-S4 safety contract
+  -> exact RecoveryStore gate when selective/lossy
+
+provider request
+  -> stable-prefix conversation epoch
+  -> provider cache economics plan
+  -> optional safe provider-native cache marker
+  -> provider-observed cache usage kept as separate evidence
+
+prompt/tool lifecycle
+  -> bounded Task Contract
+  -> relevance-ranked session-ledger evidence
+  -> live repository/tests remain authoritative
+```
+
+The native runtime is an optimization process, not a correctness dependency. It
+binds to a random loopback port, requires a private per-project bearer token,
+accepts bounded JSON events, emits no payload/access logs, and caches one
+`HookRuntime` until project configuration changes. CLI hooks fall back to the
+existing direct path when the runtime cannot be reached. A timeout does not
+replay the event because the runtime may already have committed local
+continuity/telemetry side effects.
+
+Recovery Store v2 keeps existing byte-exact `tsr_...` handles and adds
+canonical-JSON `tsr_obj_...` records. Typed records support RFC 6901 subtree
+selection and explicit dependency edges. Existing recovery databases migrate in
+place; stored payload digests are verified on retrieval and capacity remains
+no-eviction/fail-closed.
+
+`output.content_engine` classifies content separately from command routing and
+assigns a formal safety class. Format-specific invariants currently protect JSON
+syntax, changed diff lines, table headers/schema, and source declarations/syntax
+before an accepted candidate can replace the original. This is an acceptance
+gate over existing processors, not a parallel compressor registry.
+
+Provider cache planning deliberately distinguishes **planned economics** from
+**provider-observed hits**. `prefix_cache.py` stores independent bounded
+conversation epochs so interleaved agents/subagents do not overwrite one
+provider-level anchor. `provider_cache.py` can plan provider-specific break-even
+behavior and, in apply mode, add only a conservative Anthropic/Bedrock
+cache-control breakpoint when the existing request shape permits it. OpenAI
+automatic caching and Gemini explicit cached-content resources remain
+observation/planning surfaces unless their native lifecycle is controlled by the
+caller.
+
+Task Contract state is a bounded working-state projection over prompt/tool
+events: goal, explicit decisions, working files, unresolved failures, validation
+state, and named checks. Resume context combines that contract with
+relevance-ranked older ledger events. Passing validation only resolves matching
+validation-family failures; no remembered result supersedes live source or
+tests.
+
 ## Command boundary
 
 `acco.entry` no longer owns a branch for every top-level command. New
