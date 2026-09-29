@@ -13,7 +13,12 @@ from typing import Any
 from .contracts import SafetyClass
 
 _LOG = re.compile(
-    r"(?im)^(?:\[[^\]]+\]\s*)?(?:TRACE|DEBUG|INFO|WARN(?:ING)?|ERROR|FATAL|CRITICAL)\b"
+    r"(?im)^(?:\[[^\]]+\]\s*)?"
+    r"(?:\d{4}-\d{2}-\d{2}(?:[T ][^\s]+)?\s+)?"
+    r"(?:TRACE|DEBUG|INFO|WARN(?:ING)?|ERROR|FATAL|CRITICAL)\b"
+)
+_DIAGNOSTIC = re.compile(
+    r"(?i)\b(?:error|failed|failure|traceback|assertionerror|exception|panic)\b"
 )
 _DIFF = re.compile(r"(?m)^diff --git .+\n")
 _SEARCH = re.compile(r"(?m)^(?:[^:\n]+:\d+(?::\d+)?:|https?://\S+)")
@@ -91,8 +96,19 @@ def detect_content(text: str) -> ContentProfile:
         return ContentProfile(
             "search-results", 0.85, SafetyClass.S4_LOSSY_RECOVERABLE
         )
-    if _SOURCE.search(text):
-        return ContentProfile("source", 0.75, SafetyClass.S4_LOSSY_RECOVERABLE)
+    source_lines = sum(bool(_SOURCE.match(line)) for line in lines[:160])
+    if source_lines:
+        try:
+            ast.parse(text)
+        except SyntaxError:
+            if source_lines >= 3 and not _DIAGNOSTIC.search(text):
+                return ContentProfile(
+                    "source", 0.7, SafetyClass.S4_LOSSY_RECOVERABLE
+                )
+        else:
+            return ContentProfile(
+                "source", 0.95, SafetyClass.S4_LOSSY_RECOVERABLE
+            )
     if _INI.search(text) or _YAML.search(text):
         return ContentProfile("configuration", 0.7, SafetyClass.S4_LOSSY_RECOVERABLE)
     return ContentProfile("text", 0.5, SafetyClass.S4_LOSSY_RECOVERABLE)
