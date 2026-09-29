@@ -65,6 +65,7 @@ class RuntimePool:
     """Cache one HookRuntime per project while project configuration is unchanged."""
 
     def __init__(self) -> None:
+        """Initialize an empty thread-safe per-project runtime cache."""
         self._entries: dict[str, tuple[int | None, object]] = {}
         self._lock = threading.RLock()
 
@@ -246,6 +247,7 @@ def _handler_factory(root: Path, token: str, pool: RuntimePool):
             del format, args
 
         def _send(self, status: int, payload: dict) -> None:
+            """Write one bounded JSON response without reflecting request content."""
             raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
             self.send_response(status)
             self.send_header("Content-Type", "application/json")
@@ -254,6 +256,7 @@ def _handler_factory(root: Path, token: str, pool: RuntimePool):
             self.wfile.write(raw)
 
         def do_GET(self) -> None:
+            """Serve only the content-free runtime health endpoint."""
             if self.path != "/health":
                 self._send(404, {"error": "not_found"})
                 return
@@ -267,6 +270,7 @@ def _handler_factory(root: Path, token: str, pool: RuntimePool):
             )
 
         def do_POST(self) -> None:
+            """Authenticate, validate, and dispatch one bounded hook event."""
             if self.path != "/event":
                 self._send(404, {"error": "not_found"})
                 return
