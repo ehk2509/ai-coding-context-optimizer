@@ -125,13 +125,50 @@ def _compact_json_value(
             return {"_acco": {"type": "list", "items": len(value)}}
         return value
     if isinstance(value, dict):
-        return {
-            str(key): _compact_json_value(item, query_terms, depth + 1, important)
-            for key, item in value.items()
+        items = list(value.items())
+        selected = items
+        omitted = 0
+        if len(items) > 16:
+            selected_keys: list[str] = []
+            for key, item in items:
+                key_text = str(key)
+                if key_text in important or (
+                    query_terms
+                    and (
+                        any(term in key_text.lower() for term in query_terms)
+                        or _contains_terms(item, query_terms)
+                    )
+                ):
+                    selected_keys.append(key_text)
+            for key, _item in items[:8]:
+                key_text = str(key)
+                if key_text not in selected_keys:
+                    selected_keys.append(key_text)
+            selected_key_set = set(selected_keys[:16])
+            selected = [
+                (key, item)
+                for key, item in items
+                if str(key) in selected_key_set
+            ]
+            omitted = len(items) - len(selected)
+        compacted = {
+            str(key): _compact_json_value(
+                item,
+                query_terms,
+                depth + 1,
+                important,
+            )
+            for key, item in selected
         }
+        if omitted:
+            compacted["_acco_omitted_fields"] = omitted
+        return compacted
     if isinstance(value, list):
         if len(value) <= 10:
-            return [_compact_json_value(item, query_terms, depth + 1) for item in value]
+            return [
+                _compact_json_value(item, query_terms, depth + 1, important)
+                for item in value
+            ]
         learned = [
             item
             for item in value
