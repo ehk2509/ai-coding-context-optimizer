@@ -170,6 +170,45 @@ def _provider_context_budget(
     return plan, segments, schema_tokens
 
 
+def _tool_name_index(body: dict) -> dict[str, str]:
+    """Map provider tool-call ids to bounded stable tool names."""
+    names: dict[str, str] = {}
+    messages = body.get("messages")
+    if isinstance(messages, list):
+        for message in messages:
+            if not isinstance(message, dict):
+                continue
+            content = message.get("content")
+            if isinstance(content, list):
+                for block in content:
+                    if not isinstance(block, dict):
+                        continue
+                    if block.get("type") == "tool_use":
+                        call_id = block.get("id")
+                        name = block.get("name")
+                        if isinstance(call_id, str) and isinstance(name, str):
+                            names[call_id] = name[:96]
+            calls = message.get("tool_calls")
+            if isinstance(calls, list):
+                for call in calls:
+                    if not isinstance(call, dict):
+                        continue
+                    call_id = call.get("id")
+                    function = call.get("function")
+                    name = function.get("name") if isinstance(function, dict) else None
+                    if isinstance(call_id, str) and isinstance(name, str):
+                        names[call_id] = name[:96]
+    input_items = body.get("input")
+    if isinstance(input_items, list):
+        for item in input_items:
+            if not isinstance(item, dict) or item.get("type") != "function_call":
+                continue
+            call_id = item.get("call_id") or item.get("id")
+            name = item.get("name")
+            if isinstance(call_id, str) and isinstance(name, str):
+                names[call_id] = name[:96]
+    return names
+
 def _compress_tool_text(
     text: str,
     *,
