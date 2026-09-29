@@ -451,6 +451,17 @@ def batch_execute(
         job_id = str(raw_job.get("id") or index)
         prepared.append((job_id, prepared_code, files, program_file))
 
+    # The caller's max_result_bytes governs the combined model-visible batch
+    # envelope. Individual jobs may use the engine hard maximum so a moderately
+    # large result is not truncated before the batch can store the exact
+    # aggregate behind one recovery handle.
+    job_limits = ExecutionLimits(
+        timeout_seconds=normalized_limits.timeout_seconds,
+        max_result_bytes=MAX_RESULT_BYTES,
+        max_files=normalized_limits.max_files,
+        max_input_bytes=normalized_limits.max_input_bytes,
+        max_code_chars=normalized_limits.max_code_chars,
+    ).validate()
     store = recovery or RecoveryStore(repository)
     started = time.monotonic()
     results: list[dict[str, Any]] = []
@@ -465,7 +476,7 @@ def batch_execute(
             code,
             files,
             recovery=store,
-            limits=normalized_limits,
+            limits=job_limits,
         )
         if program_file:
             result["program_file"] = program_file
