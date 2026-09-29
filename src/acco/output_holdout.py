@@ -122,7 +122,7 @@ def holdout_epoch_key(body: dict, profile: ProviderRequestProfile) -> str:
 def _control_arm(epoch_key: str, control_rate: float) -> bool:
     """Assign a conversation deterministically without storing prompt content."""
     digest = hashlib.sha256(
-        f"{EXPERIMENT_ID}:{epoch_key}".encode("utf-8")
+        f"{EXPERIMENT_ID}:{epoch_key}".encode()
     ).digest()
     bucket = int.from_bytes(digest[:8], "big") / float(2**64)
     return bucket < control_rate
