@@ -1,5 +1,19 @@
 # Unreleased
 
+- **Expanded out-of-context compute into reusable and batched execution.**
+  Repository-contained restricted programs can run through `execute_file`, and
+  `batch_execute` runs up to eight preflighted jobs under aggregate input/time/
+  result bounds while preserving exact recovery for oversized aggregate JSON.
+  MCP, Python SDK, loopback SDK, TypeScript, and standalone execution continue
+  to share one validator/subprocess/recovery implementation.
+- **Added a searchable event-backed session ledger.** A private per-project
+  SQLite store records bounded redacted session lifecycle, explicit decisions,
+  file activity, commands, failures, validations, and compaction checkpoints.
+  FTS5 search is used when available with a bounded LIKE fallback.
+  `session_search` / `session_recent` are exposed through MCP and both SDKs,
+  and resume context can incorporate recent ledger state. Raw prompts and raw
+  tool-output bodies are not persisted in this ledger.
+
 - **Recorded the first gate-valid end-to-end cost result.** A frozen 24-task
   SWE-bench Verified suite (144 paired runs, Claude Code 2.1.276 + Sonnet 5 on a
   subscription, hidden-test grading) measured ACCO 1.22.1 at 58/72 solved versus
