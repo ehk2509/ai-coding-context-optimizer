@@ -231,7 +231,8 @@ def test_batch_execute_supports_inline_and_file_programs(tmp_path, monkeypatch):
     assert result["results"][0]["id"] == "lines"
     assert result["results"][0]["program_file"] == "count.py"
     assert result["results"][0]["result"] == 3
-    assert result["results"][1]["result"] == len("one\ntwo\nthree\n")
+    expected_text = (root / "a.txt").read_bytes().decode("utf-8")
+    assert result["results"][1]["result"] == len(expected_text)
 
 
 def test_batch_execute_rejects_ambiguous_program_source(tmp_path, monkeypatch):
