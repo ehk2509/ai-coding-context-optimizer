@@ -25,7 +25,7 @@ from .provider_cache import (
     plan_provider_cache,
     record_cache_plan,
 )
-from .output_holdout import apply_output_holdout
+from .output_holdout import apply_output_holdout, holdout_epoch_key
 from .provider_cost import (
     PROVIDER_MODEL_ROUTING_MODES,
     apply_calibrated_provider_route,
@@ -647,7 +647,7 @@ def transform_provider_request(
         transformed,
         profile,
         prompt=latest_user_text(transformed, profile),
-        epoch_key=conversation_epoch_key(body),
+        epoch_key=holdout_epoch_key(body, profile),
         enabled=bool(output_holdout_enabled),
         control_rate=float(output_holdout_control_rate),
         mode=output_holdout_mode,
