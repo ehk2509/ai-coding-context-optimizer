@@ -24,6 +24,7 @@ from .provider_cache import (
     plan_provider_cache,
     record_cache_plan,
 )
+from .output_holdout import apply_output_holdout
 from .provider_cost import (
     PROVIDER_MODEL_ROUTING_MODES,
     apply_calibrated_provider_route,
@@ -58,6 +59,7 @@ class ProviderTransformResult:
     model_routing: dict[str, Any] | None = None
     context_budget: dict[str, Any] | None = None
     cache_plan: dict[str, Any] | None = None
+    output_holdout: dict[str, Any] | None = None
 
     def metadata(self) -> dict:
         """Return request transformation metadata without request content."""
@@ -83,6 +85,7 @@ class ProviderTransformResult:
             },
             "context_budget": self.context_budget,
             "cache_plan": self.cache_plan,
+            "output_holdout": self.output_holdout,
             "policy": "retrieval-first-historical-only",
         }
 
@@ -455,6 +458,10 @@ def transform_provider_request(
     context_budget_total_tokens: int | None = None,
     provider_cache_mode: str = "plan",
     provider_cache_expected_reuses: int = 2,
+    output_holdout_enabled: bool = False,
+    output_holdout_control_rate: float = 0.10,
+    output_holdout_mode: str = "normal",
+    output_holdout_calibration_file: str = ".acco.output-calibration.json",
 ) -> ProviderTransformResult:
     """Optimize historical provider context while leaving current task/source intact."""
     if not isinstance(body, dict):
@@ -629,11 +636,29 @@ def transform_provider_request(
             cache_metadata["applied"] = False
             cache_metadata["apply_reason"] = "plan_only"
 
+    output_holdout = apply_output_holdout(
+        root,
+        transformed,
+        profile,
+        prompt=latest_user_text(transformed, profile),
+        epoch_key=conversation_epoch_key(body),
+        enabled=bool(output_holdout_enabled),
+        control_rate=float(output_holdout_control_rate),
+        mode=output_holdout_mode,
+        calibration_file=output_holdout_calibration_file,
+    )
+    output_holdout_metadata = output_holdout.to_dict()
+
     output_tokens = _json_tokens(transformed)
     routing_applied = bool(routing_metadata.get("applied"))
     changed = (
         transformed != body
-        and (output_tokens < original_tokens or routing_applied or cache_applied)
+        and (
+            output_tokens < original_tokens
+            or routing_applied
+            or cache_applied
+            or output_holdout.applied
+        )
     )
     if not changed:
         transformed = deepcopy(body)
@@ -694,4 +719,5 @@ def transform_provider_request(
         model_routing=routing_metadata,
         context_budget=context_plan.to_dict() if context_plan is not None else None,
         cache_plan=cache_metadata,
+        output_holdout=output_holdout_metadata,
     )
