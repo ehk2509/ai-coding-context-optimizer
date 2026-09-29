@@ -289,15 +289,20 @@ def _handler_factory(root: Path, token: str, pool: RuntimePool):
                 return
             host = str(body.get("host") or "")
             event = str(body.get("event") or "")
-            from .native_hooks import _run_native_hook_with_runtime
-
             try:
-                response = _run_native_hook_with_runtime(
-                    host,
-                    event,
-                    body["payload"],
-                    runtime=pool.get(root),
-                )
+                runtime = pool.get(root)
+                if host == "claude":
+                    _code, raw_response = runtime.run(body["payload"])
+                    response = raw_response if isinstance(raw_response, dict) else {}
+                else:
+                    from .native_hooks import _run_native_hook_with_runtime
+
+                    response = _run_native_hook_with_runtime(
+                        host,
+                        event,
+                        body["payload"],
+                        runtime=runtime,
+                    )
             except Exception:
                 response = {}
             self._send(200, {"response": response})
