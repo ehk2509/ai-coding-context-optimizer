@@ -128,6 +128,8 @@ def test_measured_report_uses_conversation_level_matched_strata(tmp_path, monkey
                 "task": "coding",
                 "mode": "normal",
                 "applied": False,
+                "provider_field": "max_tokens",
+                "original_limit": 3000,
                 "budget_tokens": 600,
             },
         )
@@ -146,6 +148,8 @@ def test_measured_report_uses_conversation_level_matched_strata(tmp_path, monkey
                 "task": "coding",
                 "mode": "normal",
                 "applied": True,
+                "provider_field": "max_tokens",
+                "original_limit": 3000,
                 "budget_tokens": 600,
             },
         )
@@ -177,6 +181,8 @@ def test_disabled_or_ineligible_observation_is_not_measurement(tmp_path, monkeyp
             "task": "coding",
             "mode": "normal",
             "applied": False,
+            "provider_field": "max_tokens",
+            "original_limit": 3000,
             "budget_tokens": 600,
         },
     )
@@ -194,6 +200,8 @@ def test_disabled_or_ineligible_observation_is_not_measurement(tmp_path, monkeyp
             "task": "coding",
             "mode": "normal",
             "applied": False,
+            "provider_field": "max_tokens",
+            "original_limit": 3000,
             "budget_tokens": 600,
         },
     )
