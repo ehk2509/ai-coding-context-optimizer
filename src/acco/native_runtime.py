@@ -17,6 +17,7 @@ import secrets
 import subprocess
 import sys
 import time
+import threading
 from typing import Any
 from urllib.error import URLError
 from urllib.request import Request, urlopen
@@ -65,6 +66,7 @@ class RuntimePool:
 
     def __init__(self) -> None:
         self._entries: dict[str, tuple[int | None, object]] = {}
+        self._lock = threading.RLock()
 
     @staticmethod
     def _config_stamp(root: Path) -> int | None:
@@ -80,14 +82,15 @@ class RuntimePool:
         resolved = root.resolve()
         key = str(resolved)
         stamp = self._config_stamp(resolved)
-        existing = self._entries.get(key)
-        if existing is not None and existing[0] == stamp:
-            return existing[1]
-        from .hook import build_hook_runtime
+        with self._lock:
+            existing = self._entries.get(key)
+            if existing is not None and existing[0] == stamp:
+                return existing[1]
+            from .hook import build_hook_runtime
 
-        runtime = build_hook_runtime(resolved)
-        self._entries[key] = (stamp, runtime)
-        return runtime
+            runtime = build_hook_runtime(resolved)
+            self._entries[key] = (stamp, runtime)
+            return runtime
 
 
 def _read_manifest(root: Path) -> RuntimeEndpoint | None:
@@ -147,6 +150,8 @@ def request_native_event(
     except TimeoutError:
         return "timeout", None
     except (OSError, URLError, ValueError):
+        # Connection/schema failure means this endpoint cannot safely be reused.
+        manifest_path(root).unlink(missing_ok=True)
         return "unavailable", None
     if not isinstance(value, dict) or not isinstance(value.get("response"), dict):
         return "unavailable", None
@@ -287,12 +292,24 @@ def _handler_factory(root: Path, token: str, pool: RuntimePool):
             if not isinstance(body, dict) or not isinstance(body.get("payload"), dict):
                 self._send(400, {"error": "invalid_event"})
                 return
+            event_payload = dict(body["payload"])
+            raw_root = event_payload.get("cwd") or event_payload.get("cwd_path")
+            if raw_root:
+                try:
+                    requested_root = Path(str(raw_root)).resolve()
+                except OSError:
+                    self._send(400, {"error": "invalid_root"})
+                    return
+                if requested_root != root:
+                    self._send(403, {"error": "wrong_project"})
+                    return
+            event_payload["cwd"] = str(root)
             host = str(body.get("host") or "")
             event = str(body.get("event") or "")
             try:
                 runtime = pool.get(root)
                 if host == "claude":
-                    _code, raw_response = runtime.run(body["payload"])
+                    _code, raw_response = runtime.run(event_payload)
                     response = raw_response if isinstance(raw_response, dict) else {}
                 else:
                     from .native_hooks import _run_native_hook_with_runtime
@@ -300,7 +317,7 @@ def _handler_factory(root: Path, token: str, pool: RuntimePool):
                     response = _run_native_hook_with_runtime(
                         host,
                         event,
-                        body["payload"],
+                        event_payload,
                         runtime=runtime,
                     )
             except Exception:
