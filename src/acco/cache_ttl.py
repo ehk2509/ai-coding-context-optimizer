@@ -114,11 +114,12 @@ def cache_ttl_report(root: Path) -> dict[str, Any]:
             if lower is None or value >= lower
         ]
         upper = min(upper_candidates) if upper_candidates else None
+        observed_hits = sum(event.get("outcome") == "hit" for event in events)
         learned = (
             upper
             if lower is not None
             and upper is not None
-            and len(hit_idles) >= 2
+            and observed_hits >= 2
             and upper >= lower
             else None
         )
@@ -127,13 +128,16 @@ def cache_ttl_report(root: Path) -> dict[str, Any]:
                 "provider": provider,
                 "model": model,
                 "observations": len(events),
-                "hits": sum(event.get("outcome") == "hit" for event in events),
+                "hits": observed_hits,
                 "misses": sum(event.get("outcome") == "miss" for event in events),
                 "hit_lower_bound_seconds": lower,
                 "expiry_upper_bound_seconds": upper,
                 "learned_ttl_seconds": learned,
                 "qualified": learned is not None,
-                "evidence_basis": "provider-observed hit/miss bounds",
+                "evidence_basis": (
+                    "provider-observed cache counters with ACCO-inferred exact-prefix "
+                    "expiry classification"
+                ),
             }
         )
     return {
