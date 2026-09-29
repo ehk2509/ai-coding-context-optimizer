@@ -110,10 +110,16 @@ class AccoEngine:
         context_budget_total_tokens: int | None = None,
         provider_cache_mode: str = "plan",
         provider_cache_expected_reuses: int = 2,
+        output_holdout_enabled: bool = False,
+        output_holdout_control_rate: float = 0.10,
+        output_holdout_mode: str = "normal",
+        output_holdout_calibration_file: str = ".acco.output-calibration.json",
+        framework: str = "sdk",
     ) -> dict[str, Any]:
         """Optimize one provider request while keeping exact recovery available."""
         if not isinstance(provider, str) or not provider.strip():
             raise ValueError("provider must be a nonempty string")
+        started = time.perf_counter()
         result = transform_provider_request(
             self.root,
             provider.strip(),
@@ -127,12 +133,21 @@ class AccoEngine:
             context_budget_total_tokens=context_budget_total_tokens,
             provider_cache_mode=provider_cache_mode,
             provider_cache_expected_reuses=provider_cache_expected_reuses,
+            output_holdout_enabled=output_holdout_enabled,
+            output_holdout_control_rate=output_holdout_control_rate,
+            output_holdout_mode=output_holdout_mode,
+            output_holdout_calibration_file=output_holdout_calibration_file,
         )
-        return {
+        payload = {
             "schema": 1,
             "body": result.body,
             "metadata": result.metadata(),
+            "original_tokens": result.original_tokens,
+            "output_tokens": result.output_tokens,
+            "changed": result.changed,
         }
+        self._observe_framework(framework, "provider.optimize", payload, started)
+        return payload
 
     def optimize_context(
         self,
