@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import asdict, dataclass
 import hashlib
+import json
 import random
 from pathlib import Path
 from statistics import mean
@@ -28,6 +29,8 @@ class OutputHoldoutDecision:
     task: str
     mode: str
     budget_tokens: int
+    enabled: bool
+    eligible: bool
     applied: bool
     provider_field: str | None
     original_limit: int | None
@@ -36,6 +39,56 @@ class OutputHoldoutDecision:
     def to_dict(self) -> dict[str, Any]:
         """Return JSON-compatible holdout metadata."""
         return asdict(self)
+
+
+def holdout_epoch_key(body: dict, profile: ProviderRequestProfile) -> str:
+    """Return a conversation-stable opaque experiment key when possible."""
+    explicit = None
+    metadata = body.get("metadata")
+    if isinstance(metadata, dict):
+        for key in ("conversation_id", "session_id", "thread_id"):
+            value = metadata.get(key)
+            if isinstance(value, str) and value:
+                explicit = value
+                break
+    if explicit is None:
+        for key in ("conversation_id", "session_id", "thread_id", "user"):
+            value = body.get(key)
+            if isinstance(value, str) and value:
+                explicit = value
+                break
+
+    anchor: dict[str, Any] = {
+        "provider": profile.provider,
+        "system": body.get("system"),
+        "instructions": body.get("instructions"),
+        "tools": body.get("tools"),
+    }
+    if explicit is not None:
+        anchor["explicit_conversation"] = explicit
+    else:
+        if profile.provider == "gemini":
+            contents = body.get("contents")
+            if isinstance(contents, list) and contents:
+                anchor["first_turn"] = contents[0]
+        else:
+            messages = body.get("messages")
+            if isinstance(messages, list) and messages:
+                anchor["first_turn"] = messages[0]
+            else:
+                input_items = body.get("input")
+                if isinstance(input_items, list) and input_items:
+                    anchor["first_turn"] = input_items[0]
+                elif isinstance(input_items, str):
+                    anchor["first_turn"] = input_items
+    encoded = json.dumps(
+        anchor,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()[:24]
 
 
 def _control_arm(epoch_key: str, control_rate: float) -> bool:
@@ -106,14 +159,18 @@ def apply_output_holdout(
     control = _control_arm(epoch_key, control_rate)
     arm = "control" if control else "treatment"
     field, current = _provider_limit(body, profile)
+    eligible = bool(
+        field is not None
+        and current is not None
+        and current > budget
+    )
     applied = False
     shaped = current
 
-    if enabled and arm == "treatment" and field is not None and current is not None:
-        shaped = min(current, budget)
-        if shaped < current:
-            _set_provider_limit(body, field, shaped)
-            applied = True
+    if enabled and arm == "treatment" and eligible:
+        shaped = budget
+        _set_provider_limit(body, field, shaped)
+        applied = True
 
     decision = OutputHoldoutDecision(
         experiment=EXPERIMENT_ID,
@@ -122,6 +179,8 @@ def apply_output_holdout(
         task=task,
         mode=mode,
         budget_tokens=budget,
+        enabled=bool(enabled),
+        eligible=eligible,
         applied=applied,
         provider_field=field,
         original_limit=current,
@@ -133,7 +192,6 @@ def apply_output_holdout(
             "kind": "output_holdout_assignment",
             "feature": "output_shaping",
             **decision.to_dict(),
-            "enabled": bool(enabled),
         },
     )
     return decision
@@ -148,7 +206,11 @@ def record_output_holdout_observation(
     decision: dict[str, Any],
 ) -> None:
     """Record one measured output-token observation for a randomized holdout arm."""
-    if decision.get("experiment") != EXPERIMENT_ID:
+    if (
+        decision.get("experiment") != EXPERIMENT_ID
+        or decision.get("enabled") is not True
+        or decision.get("eligible") is not True
+    ):
         return
     tokens = int(output_tokens)
     if tokens < 0:
@@ -165,7 +227,10 @@ def record_output_holdout_observation(
             "epoch_key": decision.get("epoch_key"),
             "task": decision.get("task"),
             "mode": decision.get("mode"),
+            "eligible": True,
             "applied": bool(decision.get("applied")),
+            "provider_field": decision.get("provider_field"),
+            "original_limit": decision.get("original_limit"),
             "budget_tokens": decision.get("budget_tokens"),
             "output_tokens": tokens,
             "evidence_basis": "provider-observed randomized holdout",
@@ -173,11 +238,12 @@ def record_output_holdout_observation(
     )
 
 
-def _epoch_means(events: list[dict]) -> dict[tuple[str, str, str, str], dict[str, list[float]]]:
+def _epoch_means(
+    events: list[dict],
+) -> dict[tuple[str, str, str, str, str], dict[str, list[float]]]:
     """Aggregate repeated turns to conversation-level means before comparison."""
-    by_epoch: dict[tuple[str, str, str, str, str], list[int]] = defaultdict(list)
-    arms: dict[tuple[str, str, str, str, str], str] = {}
-    applied: dict[tuple[str, str, str, str, str], bool] = {}
+    by_epoch: dict[tuple[str, str, str, str, str, str], list[int]] = defaultdict(list)
+    arms: dict[tuple[str, str, str, str, str, str], str] = {}
     for event in events:
         if event.get("kind") != "output_holdout_observation":
             continue
@@ -188,31 +254,34 @@ def _epoch_means(events: list[dict]) -> dict[tuple[str, str, str, str], dict[str
             continue
         if not isinstance(tokens, int) or isinstance(tokens, bool) or tokens < 0:
             continue
+        if event.get("eligible") is not True:
+            continue
+        field = event.get("provider_field")
+        if not isinstance(field, str) or not field:
+            continue
         key = (
             str(event.get("provider") or "generic"),
             str(event.get("model") or "unknown"),
             str(event.get("task") or "general"),
             str(event.get("mode") or "normal"),
+            field,
             epoch,
         )
         by_epoch[key].append(tokens)
         arms[key] = arm
-        applied[key] = bool(event.get("applied"))
 
-    strata: dict[tuple[str, str, str, str], dict[str, list[float]]] = defaultdict(
+    strata: dict[tuple[str, str, str, str, str], dict[str, list[float]]] = defaultdict(
         lambda: {"control": [], "treatment": []}
     )
     for key, values in by_epoch.items():
-        provider, model, task, mode, _epoch = key
+        provider, model, task, mode, field, _epoch = key
         arm = arms[key]
-        if arm == "treatment" and not applied[key]:
-            continue
-        strata[(provider, model, task, mode)][arm].append(mean(values))
+        strata[(provider, model, task, mode, field)][arm].append(mean(values))
     return strata
 
 
 def _weighted_reduction(
-    strata: dict[tuple[str, str, str, str], dict[str, list[float]]],
+    strata: dict[tuple[str, str, str, str, str], dict[str, list[float]]],
 ) -> tuple[float | None, int]:
     """Return matched-stratum weighted output-token reduction."""
     total_weight = 0
@@ -251,7 +320,7 @@ def output_holdout_report(root: Path, *, bootstrap_samples: int = 1000) -> dict[
     }
     if qualified:
         for _ in range(bootstrap_samples):
-            sampled: dict[tuple[str, str, str, str], dict[str, list[float]]] = {}
+            sampled: dict[tuple[str, str, str, str, str], dict[str, list[float]]] = {}
             for key, arms in qualified.items():
                 sampled[key] = {
                     "control": [
@@ -274,7 +343,7 @@ def output_holdout_report(root: Path, *, bootstrap_samples: int = 1000) -> dict[
 
     details = []
     for key, arms in sorted(strata.items()):
-        provider, model, task, mode = key
+        provider, model, task, mode, provider_field = key
         base = mean(arms["control"]) if arms["control"] else None
         treatment = mean(arms["treatment"]) if arms["treatment"] else None
         details.append(
@@ -283,6 +352,7 @@ def output_holdout_report(root: Path, *, bootstrap_samples: int = 1000) -> dict[
                 "model": model,
                 "task": task,
                 "mode": mode,
+                "provider_field": provider_field,
                 "control_epochs": len(arms["control"]),
                 "treatment_epochs": len(arms["treatment"]),
                 "control_mean_output_tokens": base,
