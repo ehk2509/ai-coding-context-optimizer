@@ -188,6 +188,28 @@ prefix record. Apply mode mutates only supported cache-control fields: currently
 a conservative Anthropic/Bedrock breakpoint when the request already has a safe
 block/tool surface. ACCO does not fabricate OpenAI cache hits or create Gemini
 cached-content resources on the caller's behalf.
+
+
+Learned runtime telemetry remains local and content-minimized:
+
+- tool-field learning stores bounded tool identities, structural JSON field
+  paths, exposure counters, retrieval counters, and timestamps; it never stores
+  the corresponding field values;
+- cache-TTL learning stores provider/model ids, opaque epoch hashes, cache token
+  counters, hit/miss attribution, and idle durations; requests without explicit
+  provider cache counters do not train the learner;
+- output-holdout telemetry stores opaque conversation hashes, provider/model,
+  task/mode, output-limit metadata, and provider-reported output token counts;
+  raw prompts and model responses are not stored;
+- provider/framework observability stores bounded provider/framework labels,
+  status classes, token counts, recovery-handle counts, latency, and transform
+  flags. The Prometheus surface intentionally omits model ids and request-shape
+  labels.
+
+The provider proxy's `/__acco/stats` and `/__acco/metrics` endpoints inherit
+the proxy bind boundary. The default loopback bind keeps them local. Operators
+who explicitly enable non-loopback binding are responsible for placing the
+proxy behind their own access control.
 Browser-context optimization consumes only caller-supplied textual payloads:
 HTML, accessibility/ARIA snapshots, or structured browser JSON. It does not
 fetch arbitrary web URLs, execute page JavaScript, control a browser, or inspect
