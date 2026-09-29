@@ -118,7 +118,12 @@ def update_contract_from_tool(
             _bounded_unique(contract.setdefault("working_files", []), path, MAX_FILES)
         failures = contract.setdefault("failures", [])
         if command and failed:
-            failures.append({"command": _redact(command, 180), "status": "active", "at": now})
+            failures.append({
+                "command": _redact(command, 180),
+                "status": "active",
+                "validation_kind": validation_kind,
+                "at": now,
+            })
             if len(failures) > MAX_FAILURES:
                 del failures[: len(failures) - MAX_FAILURES]
         validations = contract.setdefault("validations", [])
@@ -136,7 +141,11 @@ def update_contract_from_tool(
                 del validations[: len(validations) - MAX_VALIDATIONS]
             if not failed:
                 for failure in failures:
-                    if isinstance(failure, dict) and failure.get("status") == "active":
+                    if (
+                        isinstance(failure, dict)
+                        and failure.get("status") == "active"
+                        and failure.get("validation_kind") == validation_kind
+                    ):
                         failure["status"] = "resolved"
                         failure["resolved_by"] = validation_kind
                 for check in contract.setdefault("checks", []):
