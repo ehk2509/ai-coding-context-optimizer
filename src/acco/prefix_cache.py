@@ -25,6 +25,7 @@ class PrefixPlan:
     reused: bool
     reuse_mode: str = "miss"
     element_count: int = 0
+    epoch_key: str = "default"
 
     def to_dict(self) -> dict:
         """Return JSON-safe prefix metadata."""
@@ -37,6 +38,7 @@ class PrefixPlan:
             "reused": self.reused,
             "reuse_mode": self.reuse_mode,
             "element_count": self.element_count,
+            "epoch_key": self.epoch_key,
         }
 
 
@@ -107,7 +109,43 @@ def stable_prefix_element_hashes(body: dict) -> tuple[str, ...]:
     return tuple(hashes)
 
 
-def reusable_history_counts(root: Path, provider: str, body: dict) -> tuple[int, int]:
+def conversation_epoch_key(body: dict) -> str:
+    """Return a content-free key separating concurrent/subagent cache prefixes."""
+    anchor: dict = {}
+    for key in ("system", "instructions", "tools", "tool_choice"):
+        if key in body:
+            anchor[key] = body[key]
+    encoded = json.dumps(
+        anchor,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode()
+    return hashlib.sha256(encoded).hexdigest()[:20]
+
+
+def _epoch_state(data: dict, provider: str, epoch_key: str) -> dict | None:
+    """Return one provider/conversation prefix epoch when present."""
+    providers = data.get("prefix_cache_epochs", {})
+    if not isinstance(providers, dict):
+        return None
+    provider_state = providers.get(provider, {})
+    if not isinstance(provider_state, dict):
+        return None
+    epochs = provider_state.get("epochs", {})
+    if not isinstance(epochs, dict):
+        return None
+    value = epochs.get(epoch_key)
+    return value if isinstance(value, dict) else None
+
+
+def reusable_history_counts(
+    root: Path,
+    provider: str,
+    body: dict,
+    *,
+    epoch_key: str | None = None,
+) -> tuple[int, int]:
     """Return message/input elements already present in the prior stable prefix.
 
     The state contains hashes only. A count is returned only for the exact
@@ -115,7 +153,11 @@ def reusable_history_counts(root: Path, provider: str, body: dict) -> tuple[int,
     history byte-identical and optimize only the live frontier.
     """
     key = provider.strip().lower() or "generic"
-    previous = load(root).get("prefix_cache", {}).get(key)
+    data = load(root)
+    epoch = epoch_key or conversation_epoch_key(body)
+    previous = _epoch_state(data, key, epoch)
+    if previous is None:
+        previous = data.get("prefix_cache", {}).get(key)
     if not isinstance(previous, dict):
         return 0, 0
     previous_hashes = previous.get("source_element_hashes")
@@ -157,11 +199,18 @@ def observe_prefix(
     body: dict,
     *,
     source_body: dict | None = None,
+    epoch_key: str | None = None,
 ) -> PrefixPlan:
     """Record provider-visible prefix reuse plus the source-prefix fingerprint."""
     fingerprint, tokens, size, components = stable_prefix_fingerprint(body)
     key = provider.strip().lower() or "generic"
-    previous = load(root).get("prefix_cache", {}).get(key)
+    data = load(root)
+    epoch = epoch_key or conversation_epoch_key(
+        source_body if isinstance(source_body, dict) else body
+    )
+    previous = _epoch_state(data, key, epoch)
+    if previous is None:
+        previous = data.get("prefix_cache", {}).get(key)
     previous_fingerprint = (
         str(previous.get("fingerprint"))
         if isinstance(previous, dict) and previous.get("fingerprint")
@@ -225,6 +274,24 @@ def observe_prefix(
         )
         cache[key] = current
 
+        epoch_cache = data.setdefault("prefix_cache_epochs", {})
+        provider_state = epoch_cache.get(key)
+        if not isinstance(provider_state, dict):
+            provider_state = {"epochs": {}}
+        epochs = provider_state.get("epochs")
+        if not isinstance(epochs, dict):
+            epochs = {}
+        epochs[epoch] = {
+            **current,
+            "epoch_key": epoch,
+        }
+        # Bound conversation/subagent anchors; most recently touched epoch wins.
+        if len(epochs) > 16:
+            for old_key in list(epochs)[:-16]:
+                epochs.pop(old_key, None)
+        provider_state["epochs"] = epochs
+        epoch_cache[key] = provider_state
+
     update(root, mutate)
     return PrefixPlan(
         fingerprint=fingerprint,
@@ -235,6 +302,7 @@ def observe_prefix(
         reused=reused,
         reuse_mode=reuse_mode,
         element_count=len(element_hashes),
+        epoch_key=epoch,
     )
 
 
@@ -261,4 +329,14 @@ def prefix_status(root: Path) -> dict:
             "components": list(value.get("components", [])),
             "fingerprint": value.get("fingerprint"),
         }
-    return {"providers": providers}
+    data = load(root)
+    epoch_state = data.get("prefix_cache_epochs", {})
+    epoch_counts: dict[str, int] = {}
+    if isinstance(epoch_state, dict):
+        for provider, value in epoch_state.items():
+            if not isinstance(value, dict):
+                continue
+            epochs = value.get("epochs", {})
+            if isinstance(epochs, dict):
+                epoch_counts[str(provider)] = len(epochs)
+    return {"providers": providers, "epoch_counts": epoch_counts}
