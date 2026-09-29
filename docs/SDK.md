@@ -306,6 +306,52 @@ Stable-prefix reuse is tracked per bounded conversation epoch derived from the
 stable system/instructions/tool surface, preventing interleaved agents or
 subagents from overwriting one provider-wide prefix anchor.
 
+## Learned runtime reports
+
+The Python engine and loopback SDK bridge expose content-free reports for the
+new evidence loops:
+
+```python
+acco.tool_field_learning(limit=25)
+acco.cache_ttl_learning()
+acco.output_holdout(bootstrap_samples=2000)
+acco.observability(days=14)
+acco.prometheus(days=14)
+```
+
+The TypeScript client exposes the JSON reports through
+`toolFields()`, `cacheTtl()`, `outputHoldout()`, and
+`observability()`.
+
+Tool-field learning is driven by selective typed recovery. Structured JSON tool
+results can emit both an exact byte recovery handle and a typed
+`tsr_obj_...` handle. When a caller selectively recovers a JSON-Pointer subtree,
+ACCO increments only structural path counters for that tool. After repeated
+exposure/retrieval evidence, those field names become conservative compaction
+hints; values are never persisted in the learner.
+
+Provider cache-TTL learning uses only explicit provider cache counters. A missing
+counter is not interpreted as zero. Qualified TTLs require repeated observed
+hits plus an exact-prefix post-hit miss, and the report exposes both the observed
+hit lower bound and expiry upper bound.
+
+Output holdouts are opt-in through provider optimization options:
+
+```python
+prepared = acco.optimize_provider_request(
+    "anthropic",
+    body,
+    output_holdout_enabled=True,
+    output_holdout_control_rate=0.10,
+    output_holdout_mode="normal",
+)
+```
+
+Assignment is stable for an opaque conversation identity. Only requests whose
+existing provider output limit can actually be tightened are eligible. The
+result is measured provider-reported output-token evidence; it does not by itself
+prove quality or cost-per-success parity.
+
 ## Whole-context planning
 
 Custom agents can ask ACCO to allocate one total context envelope before they
