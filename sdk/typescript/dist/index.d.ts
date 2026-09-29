@@ -116,6 +116,48 @@ export interface ExecutionResult {
   recovery_handle: string | null;
 }
 
+export interface BatchExecutionJob {
+  id?: string;
+  code?: string;
+  code_file?: string;
+  files: string[];
+}
+
+export interface BatchExecutionResult {
+  schema: number;
+  language: "restricted-python";
+  job_count: number;
+  input_bytes: number;
+  result_bytes: number;
+  elapsed_ms: number;
+  out_of_context: true;
+  truncated: boolean;
+  results: Array<{ id: string } & ExecutionResult> | null;
+  preview?: string;
+  recovery_handle: string | null;
+}
+
+export interface SessionLedgerEvent {
+  id: number;
+  recorded_at: number;
+  session: string | null;
+  turn: number | null;
+  kind: string;
+  subject: string;
+  summary: string;
+  path: string | null;
+  status: string | null;
+  metadata: JsonObject;
+}
+
+export interface SessionLedgerResult {
+  schema: number;
+  count: number;
+  events: SessionLedgerEvent[];
+  query?: string;
+  mode?: "fts5" | "like";
+}
+
 export interface RecoveryResult {
   schema: number;
   handle: string;
@@ -222,6 +264,30 @@ export declare class AccoClient {
     files: string[],
     options?: JsonObject,
   ): Promise<ExecutionResult>;
+  executeFile(
+    programFile: string,
+    files: string[],
+    options?: JsonObject,
+  ): Promise<ExecutionResult & { program_file: string }>;
+  batchExecute(
+    jobs: BatchExecutionJob[],
+    options?: JsonObject,
+  ): Promise<BatchExecutionResult>;
+  sessionSearch(
+    query: string,
+    options?: {
+      kinds?: string[];
+      session?: string;
+      limit?: number;
+    },
+  ): Promise<SessionLedgerResult>;
+  sessionRecent(
+    options?: {
+      kinds?: string[];
+      session?: string;
+      limit?: number;
+    },
+  ): Promise<SessionLedgerResult>;
   planContextBudget(
     prompt: string,
     totalTokens: number,
