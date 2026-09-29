@@ -20,10 +20,14 @@ from .command_handlers.context import (
 from .command_handlers.efficiency import (
     audit_main,
     cache_economics_main,
+    cache_ttl_main,
     continuity_main,
     cost_advisor_main,
     dashboard_main,
     learn_main,
+    observability_main,
+    output_holdout_main,
+    tool_fields_main,
 )
 from .command_handlers.everyday import (
     claude_main,
@@ -186,6 +190,10 @@ DEFAULT_COMMAND_REGISTRY = CommandRegistry(
         CommandSpec("proxy", proxy_main),
         CommandSpec("browser-context", browser_context_main),
         CommandSpec("cache-economics", cache_economics_main),
+        CommandSpec("cache-ttl", cache_ttl_main),
+        CommandSpec("tool-fields", tool_fields_main),
+        CommandSpec("output-holdout", output_holdout_main),
+        CommandSpec("observability", observability_main),
         CommandSpec("continuity", continuity_main),
         CommandSpec("guardian", guardian_main),
         CommandSpec("wrap", wrap_main),
