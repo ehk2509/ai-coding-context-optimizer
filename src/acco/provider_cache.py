@@ -179,3 +179,46 @@ def observed_cache_evidence(provider: str, usage: dict[str, Any]) -> dict[str, A
         ),
         "evidence_basis": "provider-observed",
     }
+
+
+def apply_provider_cache_plan(
+    body: dict,
+    plan: ProviderCachePlan,
+) -> tuple[dict, bool, str]:
+    """Apply only provider cache controls that are safe to express inline.
+
+    OpenAI caching is automatic and Gemini explicit caches require a separate
+    resource lifecycle, so those strategies remain planning/observation only.
+    Anthropic-style requests can mark one stable-prefix breakpoint as ephemeral.
+    """
+    if not plan.eligible:
+        return body, False, plan.reason
+    if plan.provider not in {"anthropic", "bedrock"}:
+        return body, False, f"{plan.strategy}_requires_no_inline_mutation"
+
+    tools = body.get("tools")
+    if isinstance(tools, list) and tools:
+        last = tools[-1]
+        if isinstance(last, dict):
+            if "cache_control" in last:
+                return body, False, "existing_cache_control_preserved"
+            updated = dict(last)
+            updated["cache_control"] = {"type": "ephemeral"}
+            body["tools"] = [*tools[:-1], updated]
+            return body, True, "anthropic_tool_breakpoint"
+
+    system = body.get("system")
+    if isinstance(system, list) and system:
+        last = system[-1]
+        if isinstance(last, dict) and isinstance(last.get("text"), str):
+            if "cache_control" in last:
+                return body, False, "existing_cache_control_preserved"
+            updated = dict(last)
+            updated["cache_control"] = {"type": "ephemeral"}
+            body["system"] = [*system[:-1], updated]
+            return body, True, "anthropic_system_breakpoint"
+
+    # Converting a plain system string into block form changes request shape and
+    # may surprise wrappers. Keep it untouched unless the caller already uses
+    # Anthropic block-form system content.
+    return body, False, "no_safe_inline_breakpoint"
