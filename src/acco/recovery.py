@@ -201,6 +201,30 @@ class RecoveryStore:
             )
             """
         )
+        columns = {
+            str(row[1])
+            for row in connection.execute("PRAGMA table_info(recovery)").fetchall()
+        }
+        if "digest" not in columns:
+            connection.execute(
+                "ALTER TABLE recovery ADD COLUMN digest TEXT NOT NULL DEFAULT ''"
+            )
+        if "last_accessed_at" not in columns:
+            connection.execute(
+                "ALTER TABLE recovery ADD COLUMN last_accessed_at INTEGER"
+            )
+        if "access_count" not in columns:
+            connection.execute(
+                "ALTER TABLE recovery ADD COLUMN access_count INTEGER NOT NULL DEFAULT 0"
+            )
+        missing_digests = connection.execute(
+            "SELECT handle, payload FROM recovery WHERE digest = '' OR digest IS NULL"
+        ).fetchall()
+        for row in missing_digests:
+            connection.execute(
+                "UPDATE recovery SET digest = ? WHERE handle = ?",
+                (hashlib.sha256(bytes(row[1])).hexdigest(), str(row[0])),
+            )
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS recovery_objects (
