@@ -192,6 +192,7 @@ def run(payload: dict) -> tuple[int, dict | None]:
 def main(argv: list[str] | None = None) -> int:
     """Run the selected coding-host hook JSON stdin/stdout adapter."""
 
+    use_warm_runtime = argv is not None
     parser = argparse.ArgumentParser(prog="acco hook")
     parser.add_argument(
         "--host",
@@ -216,7 +217,29 @@ def main(argv: list[str] | None = None) -> int:
     if not isinstance(payload, dict):
         return _passthrough()
     try:
-        code, response = run(payload)
+        response = None
+        code = 0
+        if use_warm_runtime:
+            from .native_runtime import ensure_runtime_process, request_native_event
+
+            root = _payload_root(payload).resolve()
+            status, warm_response = request_native_event(
+                root,
+                "claude",
+                str(payload.get("hook_event_name") or ""),
+                payload,
+            )
+            if status == "ok":
+                response = warm_response
+            elif status == "timeout":
+                # Avoid replaying an event that the warm runtime may already
+                # have committed to continuity/telemetry state.
+                response = {}
+            else:
+                ensure_runtime_process(root)
+                code, response = run(payload)
+        else:
+            code, response = run(payload)
     except Exception as exc:
         print(f"acco hook error: {exc}", file=sys.stderr)
         return _passthrough()
