@@ -40,6 +40,16 @@ host's repository-trust controls where available. ACCO's ownership checks preven
 it from silently taking over unrelated hook entries; they do not make arbitrary
 third-party hooks safe.
 
+Real CLI hook traffic may use ACCO's warm native runtime. That helper binds only
+to a random 127.0.0.1 port, publishes an owner-only per-project manifest under
+`ACCO_STATE_DIR/native-runtime`, and requires a high-entropy token on every
+event request. The transport is bounded to 32 MiB and emits no hook payload or
+access log. The server verifies that an event's project root matches the runtime
+that received it. Stale endpoint manifests are discarded on connection/schema
+failure. The runtime is an optimization layer only: startup/transport failure
+falls back to the direct hook path. Timeout handling deliberately does not replay
+the same event because local state may already have been updated.
+
 ## Searchable session ledger
 
 ACCO can persist a private project-scoped SQLite event ledger under
@@ -113,8 +123,12 @@ AI-agent context layer as a secret-management system.
 
 Lossy optimization surfaces can store exact original bytes in a private
 project-scoped SQLite recovery database under `ACCO_STATE_DIR`.
-Recovery handles begin with `tsr_` and are derived from SHA-256 content
-identity. Retrieval verifies the full stored digest before returning bytes.
+Byte recovery handles begin with `tsr_` and are derived from SHA-256 content
+identity. Recovery Store v2 also supports canonical-JSON `tsr_obj_` records for
+selective RFC 6901 subtree recovery. Retrieval verifies the full stored digest
+before returning either record type. Typed records can reference existing
+recovery handles through dependency edges; dangling dependencies are refused at
+write time.
 
 Recovery handles are identifiers, **not authorization tokens**. Anyone who can
 access the local ACCO state directory may be able to recover project
@@ -128,9 +142,11 @@ cannot be stored, that lossy transform is refused and the unmodified
 representation is retained. This prevents model-visible recovery handles from
 becoming intentionally dangling.
 
-v1.13 has no per-record recovery-prune command. Deleting the project recovery
-database manually invalidates every handle it contains, so do that only when no
-active session or saved evidence depends on those handles.
+Recovery databases created by older ACCO releases are migrated in place when
+opened by Recovery Store v2; existing byte handles remain valid. There is still
+no per-record recovery-prune command. Deleting the project recovery database
+manually invalidates every handle it contains, so do that only when no active
+session or saved evidence depends on those handles.
 
 ## Provider reverse-proxy boundary
 
@@ -164,6 +180,14 @@ estimated sizes, and hit/miss counters. Provider usage telemetry stores provider
 request shape, streaming flag, bounded model id, and token/cache counters. It
 does not copy provider request or response text. Disable provider usage
 observation with `--no-usage-telemetry`.
+
+Provider-cache planning stores content-free economics metadata separately from
+provider-observed counters. Conversation epochs are keyed by hashes of stable
+system/tool surfaces so concurrent agents do not share one mutable provider
+prefix record. Apply mode mutates only supported cache-control fields: currently
+a conservative Anthropic/Bedrock breakpoint when the request already has a safe
+block/tool surface. ACCO does not fabricate OpenAI cache hits or create Gemini
+cached-content resources on the caller's behalf.
 Browser-context optimization consumes only caller-supplied textual payloads:
 HTML, accessibility/ARIA snapshots, or structured browser JSON. It does not
 fetch arbitrary web URLs, execute page JavaScript, control a browser, or inspect
