@@ -16,7 +16,8 @@ from .domain_middleware import (
     optimize_rag_context,
 )
 from .estimate import estimate_tokens
-from .execution import ExecutionLimits, execute_program
+from .efficiency.ledger import recent_ledger_events, search_ledger
+from .execution import ExecutionLimits, batch_execute, execute_file, execute_program
 from .model_routing import route_task
 from .output import OutputPolicy, OutputPipeline
 from .provider_transform import transform_provider_request
@@ -317,6 +318,77 @@ class AccoEngine:
                 max_result_bytes=max_result_bytes,
             ),
         )
+
+    def execute_file(
+        self,
+        program_file: str,
+        files: list[str] | tuple[str, ...],
+        *,
+        timeout_seconds: int = 5,
+        max_result_bytes: int = 64 * 1024,
+    ) -> dict[str, Any]:
+        """Run one repository-contained restricted analysis program."""
+        return execute_file(
+            self.root,
+            program_file,
+            files,
+            recovery=self.recovery,
+            limits=ExecutionLimits(
+                timeout_seconds=timeout_seconds,
+                max_result_bytes=max_result_bytes,
+            ),
+        )
+
+    def batch_execute(
+        self,
+        jobs: list[dict[str, Any]] | tuple[dict[str, Any], ...],
+        *,
+        timeout_seconds: int = 5,
+        max_result_bytes: int = 64 * 1024,
+    ) -> dict[str, Any]:
+        """Run a bounded batch of out-of-context analysis jobs."""
+        return batch_execute(
+            self.root,
+            jobs,
+            recovery=self.recovery,
+            limits=ExecutionLimits(
+                timeout_seconds=timeout_seconds,
+                max_result_bytes=max_result_bytes,
+            ),
+        )
+
+    def session_search(
+        self,
+        query: str,
+        *,
+        kinds: list[str] | tuple[str, ...] | None = None,
+        session: str | None = None,
+        limit: int = 12,
+    ) -> dict[str, Any]:
+        """Search redacted structured session history."""
+        return search_ledger(
+            self.root,
+            query,
+            kinds=kinds,
+            session=session,
+            limit=limit,
+        )
+
+    def session_recent(
+        self,
+        *,
+        kinds: list[str] | tuple[str, ...] | None = None,
+        session: str | None = None,
+        limit: int = 12,
+    ) -> dict[str, Any]:
+        """Return recent redacted structured session events."""
+        events = recent_ledger_events(
+            self.root,
+            kinds=kinds,
+            session=session,
+            limit=limit,
+        )
+        return {"schema": 1, "count": len(events), "events": events}
 
     def recover(self, handle: str) -> dict[str, Any]:
         """Recover exact stored bytes using a content-addressed recovery handle."""
