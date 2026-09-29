@@ -324,7 +324,9 @@ def search_ledger(
         rows: list[sqlite3.Row]
         if _fts_available(connection):
             tokens = re.findall(r"[A-Za-z0-9_./-]+", query)
-            expression = " AND ".join(f'"{token.replace(chr(34), "")}"' for token in tokens)
+            expression = " OR ".join(
+                f'"{token.replace(chr(34), "")}"' for token in tokens
+            )
             if expression:
                 try:
                     rows = connection.execute(
