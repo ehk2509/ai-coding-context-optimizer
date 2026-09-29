@@ -200,6 +200,23 @@ def provider_proxy_main(argv: list[str]) -> int:
         type=int,
         help="override total model-context budget for adaptive schema/tool slices",
     )
+    parser.add_argument(
+        "--output-holdout-rate",
+        type=float,
+        help=(
+            "enable measured output shaping with this conversation-level "
+            "control fraction, e.g. 0.10"
+        ),
+    )
+    parser.add_argument(
+        "--output-holdout-mode",
+        choices=("terse", "normal", "detailed"),
+        default="normal",
+    )
+    parser.add_argument(
+        "--output-holdout-calibration-file",
+        default=".acco.output-calibration.json",
+    )
     args = parser.parse_args(argv)
     root = Path(args.path).resolve()
     settings = settings_for(root)
@@ -243,6 +260,17 @@ def provider_proxy_main(argv: list[str]) -> int:
                     else None
                 )
             ),
+            output_holdout_enabled=(
+                args.output_holdout_rate is not None
+                and args.output_holdout_rate > 0
+            ),
+            output_holdout_control_rate=(
+                args.output_holdout_rate
+                if args.output_holdout_rate is not None
+                else 0.10
+            ),
+            output_holdout_mode=args.output_holdout_mode,
+            output_holdout_calibration_file=args.output_holdout_calibration_file,
         ).validate()
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
