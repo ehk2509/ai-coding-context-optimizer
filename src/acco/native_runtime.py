@@ -240,6 +240,8 @@ def _handler_factory(root: Path, token: str, pool: RuntimePool):
     """Build a content-silent authenticated runtime handler."""
 
     class Handler(BaseHTTPRequestHandler):
+        """Serve authenticated project-bound native hook events over loopback."""
+
         server_version = "AccoNativeRuntime/1"
 
         def log_message(self, format: str, *args) -> None:
