@@ -319,6 +319,7 @@ def route_context(
     command: str = "",
     max_lines: int = 120,
     min_reduction: float = 0.08,
+    tool_key: str = "generic-json",
 ) -> ContextRouteResult:
     """Route a payload through its safest compact representation.
 
@@ -363,8 +364,23 @@ def route_context(
                 "interactive_items": browser.interactive_items,
             },
         )
+    parsed_json = None
+    learned_fields: set[str] = set()
     if kind == "json":
-        candidate, metadata = _compress_json(text, query)
+        try:
+            parsed_json = json.loads(text)
+            observe_tool_json(recovery.root, tool_key, parsed_json)
+            learned_fields = important_field_names(recovery.root, tool_key)
+        except (ValueError, TypeError, OSError):
+            parsed_json = None
+            learned_fields = set()
+        candidate, metadata = _compress_json(
+            text,
+            query,
+            important_fields=learned_fields,
+        )
+        metadata["tool_key"] = tool_key
+        metadata["learned_field_hints"] = len(learned_fields)
     elif kind == "table":
         candidate, metadata = _compress_table(text, query, max_lines)
     elif kind == "log":
@@ -399,7 +415,28 @@ def route_context(
         return ContextRouteResult(
             text, kind, False, original_tokens, original_tokens, None, metadata
         )
-    rendered = candidate.rstrip() + f"\n[acco recovery: {handle}]\n"
+    typed_handle = None
+    if kind == "json" and parsed_json is not None:
+        try:
+            typed_handle = recovery.put_object(
+                parsed_json,
+                object_type="tool-json",
+                metadata={
+                    "transform": "context-router",
+                    "kind": kind,
+                    "tool_key": tool_key,
+                },
+                dependencies=[handle],
+            )
+        except RecoveryCapacityError:
+            typed_handle = None
+        if typed_handle:
+            metadata["typed_recovery_handle"] = typed_handle
+    recovery_marker = f"[acco recovery: {handle}"
+    if typed_handle:
+        recovery_marker += f"; selective: {typed_handle}"
+    recovery_marker += "]"
+    rendered = candidate.rstrip() + "\n" + recovery_marker + "\n"
     output_tokens = estimate_tokens(rendered)
     if output_tokens >= original_tokens or len(rendered.encode()) >= len(text.encode()):
         return ContextRouteResult(
