@@ -224,20 +224,24 @@ def field_learning_report(root: Path, *, limit: int = 50) -> dict[str, Any]:
     """Return content-free learned-field statistics for diagnostics."""
     if limit <= 0:
         raise ValueError("limit must be positive")
-    with closing(_connect(root)) as connection:
-        rows = connection.execute(
-            """
-            SELECT tool_key, field_path, exposures, retrievals, last_seen
-            FROM field_stats
-            WHERE retrievals > 0
-            ORDER BY retrievals DESC, exposures DESC, tool_key, field_path
-            LIMIT ?
-            """,
-            (int(limit),),
-        ).fetchall()
-        tools = connection.execute(
-            "SELECT COUNT(DISTINCT tool_key) FROM field_stats"
-        ).fetchone()[0]
+    try:
+        with closing(_connect(root)) as connection:
+            rows = connection.execute(
+                """
+                SELECT tool_key, field_path, exposures, retrievals, last_seen
+                FROM field_stats
+                WHERE retrievals > 0
+                ORDER BY retrievals DESC, exposures DESC, tool_key, field_path
+                LIMIT ?
+                """,
+                (int(limit),),
+            ).fetchall()
+            tools = connection.execute(
+                "SELECT COUNT(DISTINCT tool_key) FROM field_stats"
+            ).fetchone()[0]
+    except sqlite3.Error:
+        rows = []
+        tools = 0
     return {
         "schema": 1,
         "tools": int(tools or 0),
