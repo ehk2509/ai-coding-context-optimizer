@@ -215,6 +215,7 @@ def _compress_tool_text(
     query: str,
     recovery: RecoveryStore,
     min_tokens: int,
+    tool_key: str = "provider-tool-result",
 ) -> tuple[str, str | None]:
     """Route one large historical tool-result string through exact recovery."""
     if estimate_tokens(text) < min_tokens:
@@ -226,6 +227,7 @@ def _compress_tool_text(
         command="provider-tool-result",
         max_lines=100,
         min_reduction=0.08,
+        tool_key=tool_key,
     )
     return (
         result.text,
