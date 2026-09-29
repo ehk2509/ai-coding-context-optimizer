@@ -768,6 +768,40 @@ This makes host behavior testable without filesystem-backed session state or a
 Claude process, and lets another host reuse the same runtime policy with a
 different adapter.
 
+## Searchable session-ledger boundary
+
+`acco.efficiency.ledger` is a project-scoped event/history component distinct
+from both the compact continuity snapshot and durable project knowledge.
+
+```text
+HookRuntime events
+  ├── session start / prompt task
+  ├── explicit decision/preference snippets
+  ├── file Read/Edit/Write activity
+  ├── redacted commands / failures / validation
+  └── pre-compaction checkpoint
+        ↓
+private SQLite events table
+        ↓
+FTS5 summary/subject/path index when available
+        ↓
+session_search / session_recent
+        ↓
+bounded resume context or explicit historical retrieval
+```
+
+Raw prompts and raw tool-result bodies are not persisted in this ledger.
+Decision capture is deliberately narrow: only sentences containing explicit
+decision/preference language are retained, after the same credential-style
+redaction used for persisted command labels. Metadata accepts only bounded
+JSON scalars.
+
+The ledger is not repository truth and does not participate in source ranking.
+It records *what happened*. `FindingStore` / project memory records
+*conclusions deliberately preserved*. The ordinary continuity snapshot remains
+the cheap latest-state path; the ledger gives older searchable history without
+forcing that history back into every model call.
+
 ## Out-of-context execution boundary
 
 Programmable execution is a separate application primitive in
@@ -794,7 +828,11 @@ large result → exact recovery store + bounded preview
 The model supplies only the analysis program and file names. ACCO reads the
 selected source locally and passes it directly to the child process, so the
 large bytes do not need to be copied through model context merely to count,
-group, filter, scan, or summarize them.
+group, filter, scan, or summarize them. The same boundary now has three
+orchestration surfaces: inline `execute`, repository-contained
+`execute_file`, and bounded `batch_execute`. All delegate to the same
+validator/subprocess/recovery implementation rather than creating new execution
+engines.
 
 The language surface rejects imports, arbitrary file access, process/shell
 entry points, dynamic evaluation/introspection helpers, private/dunder traversal,
