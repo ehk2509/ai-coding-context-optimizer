@@ -41,6 +41,13 @@ def main(argv: list[str] | None = None) -> int:
         from .execution import execution_worker_main
 
         return execution_worker_main()
+    if args[0] == "__acco-native-runtime":
+        from pathlib import Path
+        from .native_runtime import serve_native_runtime
+
+        if len(args) != 2:
+            return 2
+        return serve_native_runtime(Path(args[1]))
     if args[0] == "proxy-run":
         return proxy_run_main(args[1:])
     return DEFAULT_COMMAND_REGISTRY.dispatch(args, legacy_main)
