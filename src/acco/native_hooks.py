@@ -621,23 +621,30 @@ def _run_native_hook_with_runtime(
     return adapt_response(host, event, response)
 
 
-def run_native_hook(host: str, event: str, payload: dict) -> dict:
-    """Use the warm local runtime when available, with fail-open direct fallback."""
-    root = Path(_project_root(payload)).resolve()
-    try:
-        from .native_runtime import ensure_runtime_process, request_native_event
+def run_native_hook(
+    host: str,
+    event: str,
+    payload: dict,
+    *,
+    use_warm_runtime: bool = False,
+) -> dict:
+    """Run one native event, optionally using the persistent local runtime."""
+    if use_warm_runtime:
+        root = Path(_project_root(payload)).resolve()
+        try:
+            from .native_runtime import ensure_runtime_process, request_native_event
 
-        status, response = request_native_event(root, host, event, payload)
-        if status == "ok" and response is not None:
-            return response
-        if status == "timeout":
-            # The warm runtime may already have recorded this event. Do not replay
-            # side effects through a second direct invocation.
-            return {}
-        ensure_runtime_process(root)
-    except Exception:
-        # The runtime is an optimization layer, never a correctness dependency.
-        pass
+            status, response = request_native_event(root, host, event, payload)
+            if status == "ok" and response is not None:
+                return response
+            if status == "timeout":
+                # The warm runtime may already have recorded this event. Do not
+                # replay side effects through a second direct invocation.
+                return {}
+            ensure_runtime_process(root)
+        except Exception:
+            # The runtime is an optimization layer, never a correctness dependency.
+            pass
     return _run_native_hook_with_runtime(host, event, payload)
 
 
@@ -647,7 +654,7 @@ def main(host: str, event: str) -> int:
         payload = json.loads(sys.stdin.read() or "{}")
         if not isinstance(payload, dict):
             payload = {}
-        response = run_native_hook(host, event, payload)
+        response = run_native_hook(host, event, payload, use_warm_runtime=True)
     except Exception as exc:
         # Native hook integrations are optimization layers, not permission
         # authorities. Emit valid empty JSON so host failures remain fail-open.
