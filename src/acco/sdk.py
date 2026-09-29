@@ -402,8 +402,19 @@ class AccoEngine:
         )
         return {"schema": 1, "count": len(events), "events": events}
 
-    def recover(self, handle: str) -> dict[str, Any]:
-        """Recover exact stored bytes using a content-addressed recovery handle."""
+    def recover(
+        self,
+        handle: str,
+        *,
+        pointer: str | None = None,
+    ) -> dict[str, Any]:
+        """Recover exact bytes or one typed-object JSON-Pointer subtree."""
+        if handle.startswith("tsr_obj_") or handle.startswith("tsr://"):
+            return {
+                "schema": 1,
+                "kind": "object",
+                **self.recovery.select(handle, pointer),
+            }
         record = self.recovery.get(handle)
         try:
             text = record.payload.decode("utf-8")
@@ -414,6 +425,7 @@ class AccoEngine:
             encoding = "base64"
         return {
             "schema": 1,
+            "kind": "bytes",
             "handle": record.handle,
             "content_type": record.content_type,
             "encoding": encoding,
