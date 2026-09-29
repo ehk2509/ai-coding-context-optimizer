@@ -189,6 +189,57 @@ export interface ModelRouteDecision {
   action: "recommend" | "keep" | "route" | "manual";
 }
 
+export interface ToolFieldLearningReport {
+  schema: number;
+  tools: number;
+  fields: Array<{
+    tool: string;
+    field_path: string;
+    exposures: number;
+    retrievals: number;
+    confidence: number;
+    last_seen: number;
+  }>;
+  privacy: string;
+}
+
+export interface CacheTtlReport {
+  schema: number;
+  estimates: Array<{
+    provider: string;
+    model: string;
+    observations: number;
+    hits: number;
+    misses: number;
+    hit_lower_bound_seconds: number | null;
+    expiry_upper_bound_seconds: number | null;
+    learned_ttl_seconds: number | null;
+    qualified: boolean;
+    evidence_basis: string;
+  }>;
+  policy: string;
+}
+
+export interface OutputHoldoutReport {
+  schema: number;
+  experiment: string;
+  matched_epoch_weight: number;
+  measured_output_token_reduction: number | null;
+  ci95: [number, number] | null;
+  strata: JsonObject[];
+  claim_boundary: string;
+}
+
+export interface ObservabilityReport {
+  schema: number;
+  window_days: number;
+  providers: Record<string, JsonObject>;
+  frameworks: Record<string, JsonObject>;
+  cache_ttl: Record<string, number>;
+  output_holdout: Record<string, number>;
+  evidence: string;
+}
+
 export interface ToolResultInput {
   text: string;
   query?: string;
@@ -298,6 +349,10 @@ export declare class AccoClient {
     options?: JsonObject,
   ): Promise<ModelRouteDecision>;
   recover(handle: string): Promise<RecoveryResult>;
+  observability(days?: number): Promise<ObservabilityReport>;
+  cacheTtl(): Promise<CacheTtlReport>;
+  outputHoldout(bootstrapSamples?: number): Promise<OutputHoldoutReport>;
+  toolFields(limit?: number): Promise<ToolFieldLearningReport>;
   interceptFetch(
     provider: string,
     options?: ProviderFetchOptions,
