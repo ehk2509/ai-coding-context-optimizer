@@ -22,6 +22,7 @@ from .model_routing import route_task
 from .output import OutputPolicy, OutputPipeline
 from .provider_transform import transform_provider_request
 from .recovery import DEFAULT_CAPACITY_BYTES, RecoveryCapacityError, RecoveryStore
+from .tool_field_learning import record_field_retrieval
 
 
 @dataclass(frozen=True)
@@ -410,10 +411,16 @@ class AccoEngine:
     ) -> dict[str, Any]:
         """Recover exact bytes or one typed-object JSON-Pointer subtree."""
         if handle.startswith("tsr_obj_") or handle.startswith("tsr://"):
+            selected = self.recovery.select(handle, pointer)
+            metadata = selected.get("metadata")
+            tool_key = metadata.get("tool_key") if isinstance(metadata, dict) else None
+            selected_pointer = selected.get("pointer")
+            if isinstance(tool_key, str) and isinstance(selected_pointer, str):
+                record_field_retrieval(self.root, tool_key, selected_pointer)
             return {
                 "schema": 1,
                 "kind": "object",
-                **self.recovery.select(handle, pointer),
+                **selected,
             }
         record = self.recovery.get(handle)
         try:
