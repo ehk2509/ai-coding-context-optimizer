@@ -38,7 +38,7 @@ def test_task_contract_keeps_goal_decisions_files_and_named_checks(tmp_path, mon
 
     contract = _contract(root)
 
-    assert contract["goal"] == "coding task"
+    assert contract["goal"] == f"{contract['task_class']} task"
     assert contract["decision_count"] >= 1
     assert "src/session.py" in contract["working_files"]
     snapshot_text = str(contract)
@@ -130,6 +130,6 @@ def test_resume_contains_task_contract_and_older_relevant_history(tmp_path, monk
 
     assert context is not None
     assert "ACCO TASK CONTRACT" in context
-    assert "Goal: coding task." in context
+    assert "Goal: general task." in context
     assert "Relevant earlier project-session evidence" in context
     assert "repository service" in context
