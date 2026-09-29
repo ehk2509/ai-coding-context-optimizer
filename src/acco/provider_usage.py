@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .efficiency.store import append_event
+from .provider_cache import observed_cache_evidence
 
 _MAX_JSON_OBSERVE_BYTES = 2 * 1024 * 1024
 
@@ -172,6 +173,7 @@ class ProviderUsageObserver:
                 self._merge(payload)
         if not self._usage:
             return {}
+        cache_evidence = observed_cache_evidence(self.provider, self._usage)
         event = {
             "kind": "provider_usage",
             "feature": "provider_boundary",
@@ -179,6 +181,8 @@ class ProviderUsageObserver:
             "request_shape": self.request_shape,
             "streaming": self.streaming,
             **self._usage,
+            "cache_observed": cache_evidence["cache_observed"],
+            "cache_evidence_basis": cache_evidence["evidence_basis"],
         }
         append_event(self.root, event)
         return event
