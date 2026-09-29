@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from .context_budget import ContextBudgetPlan, plan_context_budget
+from .cache_ttl import learned_ttl_seconds
 from .context_router import route_context
 from .efficiency.store import append_event
 from .estimate import estimate_tokens
@@ -625,6 +626,11 @@ def transform_provider_request(
         record_cache_plan(root, cache_plan)
         cache_metadata = cache_plan.to_dict()
         cache_metadata["mode"] = cache_mode
+        cache_metadata["learned_ttl_seconds"] = learned_ttl_seconds(
+            root,
+            profile.provider,
+            str(transformed.get("model")) if transformed.get("model") else None,
+        )
         if cache_mode == "apply":
             transformed, cache_applied, apply_reason = apply_provider_cache_plan(
                 transformed,
