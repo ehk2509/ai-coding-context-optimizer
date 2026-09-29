@@ -1,5 +1,14 @@
 # Unreleased
 
+- **Recorded the first gate-valid end-to-end cost result.** A frozen 24-task
+  SWE-bench Verified suite (144 paired runs, Claude Code 2.1.276 + Sonnet 5 on a
+  subscription, hidden-test grading) measured ACCO 1.22.1 at 58/72 solved versus
+  58/72 for plain Claude Code, with 26.2% lower equivalent cost per solved task
+  (task-cluster 95% CI 12.3–37.1%), 26% fewer tokens and 16.5% fewer model calls.
+  `acco benchmark` reports `protocol_valid: true`. Scoped to that model, host
+  and suite; blind output-quality grading was not run, and 1.23.0 features are
+  not measured.
+
 # 1.23.0 - 2026-09-28
 
 - **Added first-class out-of-context programmable execution.** ACCO can run a

@@ -1,5 +1,9 @@
 # Paired SWE-bench run on a Claude subscription (144 runs, 2026-09-25/27)
 
+> **Superseded** by the frozen, gate-valid re-run:
+> [`e2e-swebench-24-subscription.frozen.result.md`](e2e-swebench-24-subscription.frozen.result.md)
+> (ACCO 1.22.1, 58/72 vs 58/72, −26.2% cost per success).
+
 **Status: development evidence, not a publishable savings claim.** The task
 definitions were adapted for local subscription runs (repository paths, runner
 command, task-image execution), so the suite is not frozen, and ACCO solved one
