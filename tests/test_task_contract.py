@@ -38,9 +38,12 @@ def test_task_contract_keeps_goal_decisions_files_and_named_checks(tmp_path, mon
 
     contract = _contract(root)
 
-    assert contract["goal"].startswith("Fix refresh handling")
-    assert any("repository service" in item for item in contract["decisions"])
+    assert contract["goal"] == "coding task"
+    assert contract["decision_count"] >= 1
     assert "src/session.py" in contract["working_files"]
+    snapshot_text = str(contract)
+    assert "Fix refresh handling" not in snapshot_text
+    assert "repository service" not in snapshot_text
 
 
 def test_validation_only_resolves_failure_from_same_family(tmp_path, monkeypatch):
@@ -127,6 +130,6 @@ def test_resume_contains_task_contract_and_older_relevant_history(tmp_path, monk
 
     assert context is not None
     assert "ACCO TASK CONTRACT" in context
-    assert "Fix refresh handling" in context
+    assert "Goal: coding task." in context
     assert "Relevant earlier project-session evidence" in context
     assert "repository service" in context
