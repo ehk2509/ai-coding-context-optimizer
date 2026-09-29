@@ -11,6 +11,11 @@ import time
 from ..estimate import estimate_tokens
 from ..generation_policy import classify_output_task
 from .ledger import append_ledger_event, decision_summaries, resume_ledger_context
+from .task_contract import (
+    task_contract_context,
+    update_contract_from_prompt,
+    update_contract_from_tool,
+)
 from .store import append_event, load_snapshot, update_snapshot
 
 MAX_SESSIONS = 8
@@ -202,6 +207,12 @@ def observe_prompt(
             subject="user-decision",
             summary=decision,
         )
+    update_contract_from_prompt(
+        root,
+        key,
+        prompt,
+        task_class=task or "general",
+    )
 
 
 def deduplicate_output(
@@ -527,6 +538,16 @@ def observe_tool(
                 summary=f"{validation_kind}: {command_label}",
             )
 
+    update_contract_from_tool(
+        root,
+        key,
+        tool=tool,
+        path=path,
+        command=command_label,
+        failed=failed,
+        validation_kind=validation_kind,
+    )
+
     if original_tokens > delivered_tokens:
         feature = (
             "cross_turn_dedup"
@@ -567,13 +588,24 @@ def continuity_context(
         source=source,
         enabled=enabled,
     )
+    session_key = _session_key(session_id)
+    contract = task_contract_context(
+        root,
+        session_key=session_key,
+        max_events=6,
+    )
     ledger = resume_ledger_context(
         root,
-        session=_session_key(session_id),
-        limit=8,
+        session=session_key,
+        limit=6,
     )
     if guarded:
-        return guarded + ("\n\n" + ledger if ledger else "")
+        parts = [guarded]
+        if contract:
+            parts.append(contract)
+        elif ledger:
+            parts.append(ledger)
+        return "\n\n".join(parts)
     snapshot = load_snapshot(root)
     sessions = snapshot.get("sessions")
     if not isinstance(sessions, dict) or not sessions:
@@ -634,4 +666,6 @@ def continuity_context(
         },
     )
     rendered = "\n".join(lines)
+    if contract:
+        return rendered + "\n\n" + contract
     return rendered + ("\n\n" + ledger if ledger else "")
