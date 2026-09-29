@@ -88,6 +88,24 @@ class SdkApplication:
         if method != "POST":
             return 405, {"error": "method_not_allowed"}
 
+        if path == "/v1/observability":
+            return 200, self.engine.observability(
+                days=int(body.get("days", 7)),
+            )
+
+        if path == "/v1/cache-ttl":
+            return 200, self.engine.cache_ttl_learning()
+
+        if path == "/v1/output-holdout":
+            return 200, self.engine.output_holdout(
+                bootstrap_samples=int(body.get("bootstrap_samples", 1000)),
+            )
+
+        if path == "/v1/tool-fields":
+            return 200, self.engine.tool_field_learning(
+                limit=int(body.get("limit", 50)),
+            )
+
         if path == "/v1/provider/optimize":
             provider = body.get("provider")
             request_body = body.get("body")
