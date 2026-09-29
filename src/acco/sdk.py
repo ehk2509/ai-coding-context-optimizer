@@ -327,15 +327,19 @@ class AccoEngine:
         query: str = "",
         max_documents: int = 8,
         min_reduction: float = 0.08,
+        framework: str = "sdk",
     ) -> dict[str, Any]:
         """Compress caller-supplied RAG documents for model context."""
-        return optimize_rag_context(
+        started = time.perf_counter()
+        result = optimize_rag_context(
             documents,
             query=query,
             recovery=self.recovery,
             max_documents=max_documents,
             min_reduction=min_reduction,
         )
+        self._observe_framework(framework, "middleware.rag", result, started)
+        return result
 
     def optimize_api_payload(
         self,
@@ -343,14 +347,18 @@ class AccoEngine:
         *,
         query: str = "",
         min_reduction: float = 0.08,
+        framework: str = "sdk",
     ) -> dict[str, Any]:
         """Compress caller-supplied JSON API data for model context."""
-        return optimize_api_payload(
+        started = time.perf_counter()
+        result = optimize_api_payload(
             payload,
             query=query,
             recovery=self.recovery,
             min_reduction=min_reduction,
         )
+        self._observe_framework(framework, "middleware.api", result, started)
+        return result
 
     def optimize_database_rows(
         self,
@@ -360,9 +368,11 @@ class AccoEngine:
         columns: list[str] | None = None,
         max_rows: int = 20,
         min_reduction: float = 0.08,
+        framework: str = "sdk",
     ) -> dict[str, Any]:
         """Compress caller-supplied query results without opening a database."""
-        return optimize_database_rows(
+        started = time.perf_counter()
+        result = optimize_database_rows(
             rows,
             query=query,
             recovery=self.recovery,
@@ -370,6 +380,8 @@ class AccoEngine:
             max_rows=max_rows,
             min_reduction=min_reduction,
         )
+        self._observe_framework(framework, "middleware.database", result, started)
+        return result
 
     def execute(
         self,
