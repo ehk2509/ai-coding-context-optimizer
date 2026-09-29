@@ -1,10 +1,14 @@
 """Tests for provider cache-TTL learning from observed cache counters."""
 
+import json
+
 from acco.cache_ttl import (
     cache_ttl_report,
     learned_ttl_seconds,
     record_cache_observation,
 )
+from acco.efficiency.store import load_events
+from acco.provider_usage import ProviderUsageObserver
 
 
 def _root(tmp_path, monkeypatch):
@@ -132,3 +136,66 @@ def test_ttl_learning_is_isolated_by_provider_and_model(tmp_path, monkeypatch):
 
     assert learned_ttl_seconds(root, "anthropic", "model-a") == 200
     assert learned_ttl_seconds(root, "anthropic", "model-b") is None
+
+
+def test_missing_cache_counter_does_not_train_ttl(tmp_path, monkeypatch):
+    """A missing cache counter must not be interpreted as an observed cache miss."""
+    root = _root(tmp_path, monkeypatch)
+    observer = ProviderUsageObserver(
+        root,
+        provider="openai",
+        request_shape="openai-responses",
+        streaming=False,
+        content_type="application/json",
+        cache_context={"epoch_key": "e1", "reuse_mode": "exact"},
+        request_model="gpt-test",
+    )
+    observer.feed(
+        json.dumps(
+            {
+                "model": "gpt-test",
+                "usage": {"input_tokens": 100, "output_tokens": 20},
+            }
+        ).encode()
+    )
+    observer.finish()
+
+    assert not any(
+        event.get("kind") == "cache_ttl_observation"
+        for event in load_events(root)
+    )
+
+
+def test_explicit_zero_cached_tokens_is_valid_miss_evidence(tmp_path, monkeypatch):
+    """Provider-supplied cached_tokens=0 is evidence even though the value is zero."""
+    root = _root(tmp_path, monkeypatch)
+    observer = ProviderUsageObserver(
+        root,
+        provider="openai",
+        request_shape="openai-responses",
+        streaming=False,
+        content_type="application/json",
+        cache_context={"epoch_key": "e1", "reuse_mode": "exact"},
+        request_model="gpt-test",
+    )
+    observer.feed(
+        json.dumps(
+            {
+                "model": "gpt-test",
+                "usage": {
+                    "input_tokens": 100,
+                    "output_tokens": 20,
+                    "input_tokens_details": {"cached_tokens": 0},
+                },
+            }
+        ).encode()
+    )
+    observer.finish()
+
+    observations = [
+        event
+        for event in load_events(root)
+        if event.get("kind") == "cache_ttl_observation"
+    ]
+    assert len(observations) == 1
+    assert observations[0]["cache_read_input_tokens"] == 0
