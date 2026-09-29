@@ -177,7 +177,11 @@ def transform_request_bytes(
         if result.changed
         else raw
     )
-    return TransformedRequest(encoded, result.metadata())
+    metadata = result.metadata()
+    model = result.body.get("model")
+    if isinstance(model, str):
+        metadata["request_model"] = model[:160]
+    return TransformedRequest(encoded, metadata)
 
 
 def _upstream_url(base: str, path: str) -> str:
@@ -326,6 +330,16 @@ def _handler_factory(
                     request_shape=request_shape,
                     streaming=streaming,
                     content_type=response.headers.get("Content-Type", ""),
+                    cache_context=(
+                        transformed.metadata.get("prefix")
+                        if isinstance(transformed.metadata.get("prefix"), dict)
+                        else None
+                    ),
+                    request_model=(
+                        str(transformed.metadata.get("request_model"))
+                        if transformed.metadata.get("request_model")
+                        else None
+                    ),
                 )
                 if config.usage_telemetry
                 else None
