@@ -62,7 +62,15 @@ class OutputPipeline:
             max_lines=active_policy.max_lines,
             keep_tail=active_policy.keep_tail,
         )
-        candidate, recovered = recover_critical_lines(text, candidate)
+        recovered: tuple[str, ...] = ()
+        if profile.kind not in {
+            "json",
+            "diff",
+            "markdown-table",
+            "delimited-table",
+            "source",
+        }:
+            candidate, recovered = recover_critical_lines(text, candidate)
         valid, validation = validate_candidate(text, candidate, profile)
         if not valid:
             candidate = text
