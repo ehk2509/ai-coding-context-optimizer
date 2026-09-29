@@ -250,9 +250,17 @@ def _memory_get(context: McpToolContext, arguments: dict) -> list[dict]:
 
 
 def _recover_context(context: McpToolContext, arguments: dict) -> dict:
-    """Recover exact bytes stored before a lossy ACCO transform."""
-    handle = str(arguments.get("handle", ""))
-    record = RecoveryStore(context.root).get(handle)
+    """Recover exact bytes or one selected typed-object subtree."""
+    reference = str(arguments.get("handle", ""))
+    pointer = arguments.get("pointer")
+    store = RecoveryStore(context.root)
+    if reference.startswith("tsr_obj_") or reference.startswith("tsr://"):
+        selected = store.select(
+            reference,
+            str(pointer) if isinstance(pointer, str) else None,
+        )
+        return {"kind": "object", **selected}
+    record = store.get(reference)
     try:
         text = record.payload.decode("utf-8")
         encoding = "utf-8"
@@ -261,6 +269,7 @@ def _recover_context(context: McpToolContext, arguments: dict) -> dict:
         encoding = "base64"
         payload = base64.b64encode(record.payload).decode("ascii")
     return {
+        "kind": "bytes",
         "handle": record.handle,
         "content_type": record.content_type,
         "encoding": encoding,
@@ -711,12 +720,16 @@ DEFAULT_TOOL_REGISTRY = McpToolRegistry(
         ),
         McpToolSpec(
             "recover_context",
-            "Recover exact bytes by a tsr_ recovery handle emitted by a lossy ACCO transform.",
+            "Recover exact bytes or one JSON-Pointer subtree from typed ACCO recovery.",
             {
                 "type": "object",
                 "required": ["handle"],
                 "properties": {
-                    "handle": {"type": "string", "pattern": "^tsr_[0-9a-f]{32}$"}
+                    "handle": {
+                        "type": "string",
+                        "pattern": "^(?:tsr_[0-9a-f]{32}|tsr_obj_[0-9a-f]{32}|tsr://tsr_obj_[0-9a-f]{32}(?:/.*)?)$"
+                    },
+                    "pointer": {"type": "string"}
                 },
             },
             _recover_context,
