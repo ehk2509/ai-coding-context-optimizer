@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 from dataclasses import dataclass
 from pathlib import Path
+import time
 from typing import Any
 
 from .browser_context import compress_browser_payload
@@ -19,6 +20,7 @@ from .estimate import estimate_tokens
 from .efficiency.ledger import recent_ledger_events, search_ledger
 from .execution import ExecutionLimits, batch_execute, execute_file, execute_program
 from .model_routing import route_task
+from .observability import record_framework_operation
 from .output import OutputPolicy, OutputPipeline
 from .provider_transform import transform_provider_request
 from .recovery import DEFAULT_CAPACITY_BYTES, RecoveryCapacityError, RecoveryStore
@@ -66,6 +68,34 @@ class AccoEngine:
             capacity_bytes=self.recovery_capacity_bytes,
         )
         self.output_pipeline = OutputPipeline()
+
+    def _observe_framework(
+        self,
+        framework: str,
+        operation: str,
+        result: dict[str, Any],
+        started: float,
+    ) -> None:
+        """Record content-free SDK/framework operation metrics."""
+        before = result.get("original_tokens")
+        after = result.get("output_tokens")
+        if not isinstance(before, int) or isinstance(before, bool):
+            return
+        if not isinstance(after, int) or isinstance(after, bool):
+            return
+        try:
+            record_framework_operation(
+                self.root,
+                framework=framework,
+                operation=operation,
+                original_tokens=before,
+                output_tokens=after,
+                latency_ms=(time.perf_counter() - started) * 1000.0,
+                changed=bool(result.get("changed")),
+                success=True,
+            )
+        except OSError:
+            pass
 
     def optimize_provider_request(
         self,
