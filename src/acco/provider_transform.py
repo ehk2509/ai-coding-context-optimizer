@@ -14,9 +14,15 @@ from .efficiency.store import append_event
 from .estimate import estimate_tokens
 from .prefix_cache import (
     PrefixPlan,
+    conversation_epoch_key,
     observe_prefix,
     reusable_history_counts,
     stable_prefix_fingerprint,
+)
+from .provider_cache import (
+    apply_provider_cache_plan,
+    plan_provider_cache,
+    record_cache_plan,
 )
 from .provider_cost import (
     PROVIDER_MODEL_ROUTING_MODES,
@@ -51,6 +57,7 @@ class ProviderTransformResult:
     estimated_duplicate_tokens_saved: int = 0
     model_routing: dict[str, Any] | None = None
     context_budget: dict[str, Any] | None = None
+    cache_plan: dict[str, Any] | None = None
 
     def metadata(self) -> dict:
         """Return request transformation metadata without request content."""
@@ -75,6 +82,7 @@ class ProviderTransformResult:
                 "applied": False,
             },
             "context_budget": self.context_budget,
+            "cache_plan": self.cache_plan,
             "policy": "retrieval-first-historical-only",
         }
 
@@ -376,6 +384,8 @@ def transform_provider_request(
     model_routing_min_savings: float = 0.05,
     live_zone: bool = True,
     context_budget_total_tokens: int | None = None,
+    provider_cache_mode: str = "plan",
+    provider_cache_expected_reuses: int = 2,
 ) -> ProviderTransformResult:
     """Optimize historical provider context while leaving current task/source intact."""
     if not isinstance(body, dict):
@@ -433,6 +443,11 @@ def transform_provider_request(
         )
     if not 0 <= model_routing_min_savings <= 1:
         raise ValueError("model_routing_min_savings must be between 0 and 1")
+    cache_mode = str(provider_cache_mode or "off").strip().lower()
+    if cache_mode not in {"off", "plan", "apply"}:
+        raise ValueError("provider_cache_mode must be one of: off, plan, apply")
+    if isinstance(provider_cache_expected_reuses, bool) or int(provider_cache_expected_reuses) < 0:
+        raise ValueError("provider_cache_expected_reuses must be nonnegative")
 
     try:
         history = deduplicate_provider_history(
@@ -504,11 +519,49 @@ def transform_provider_request(
         min_savings=model_routing_min_savings,
     )
 
+    cache_metadata: dict[str, Any] | None = None
+    cache_applied = False
+    if cache_mode != "off":
+        fingerprint, tokens, size, components = stable_prefix_fingerprint(transformed)
+        epoch = conversation_epoch_key(body)
+        provisional_prefix = PrefixPlan(
+            fingerprint=fingerprint,
+            stable_tokens=tokens,
+            stable_bytes=size,
+            components=components,
+            previous_fingerprint=None,
+            reused=False,
+            epoch_key=epoch,
+        )
+        cache_plan = plan_provider_cache(
+            profile.provider,
+            provisional_prefix,
+            model=(
+                str(transformed.get("model"))
+                if isinstance(transformed.get("model"), str)
+                else None
+            ),
+            expected_reuses=int(provider_cache_expected_reuses),
+        )
+        record_cache_plan(root, cache_plan)
+        cache_metadata = cache_plan.to_dict()
+        cache_metadata["mode"] = cache_mode
+        if cache_mode == "apply":
+            transformed, cache_applied, apply_reason = apply_provider_cache_plan(
+                transformed,
+                cache_plan,
+            )
+            cache_metadata["applied"] = cache_applied
+            cache_metadata["apply_reason"] = apply_reason
+        else:
+            cache_metadata["applied"] = False
+            cache_metadata["apply_reason"] = "plan_only"
+
     output_tokens = _json_tokens(transformed)
     routing_applied = bool(routing_metadata.get("applied"))
     changed = (
         transformed != body
-        and (output_tokens < original_tokens or routing_applied)
+        and (output_tokens < original_tokens or routing_applied or cache_applied)
     )
     if not changed:
         transformed = deepcopy(body)
@@ -552,6 +605,7 @@ def transform_provider_request(
             components=components,
             previous_fingerprint=None,
             reused=False,
+            epoch_key=conversation_epoch_key(body),
         )
     return ProviderTransformResult(
         body=transformed,
@@ -567,4 +621,5 @@ def transform_provider_request(
         estimated_duplicate_tokens_saved=duplicate_tokens_saved,
         model_routing=routing_metadata,
         context_budget=context_plan.to_dict() if context_plan is not None else None,
+        cache_plan=cache_metadata,
     )
