@@ -639,7 +639,8 @@ def continuity_context(
         if isinstance(item, dict) and item.get("label")
     ]
     if not any((files, validations, failures, commands)):
-        return None
+        parts = [item for item in (contract, ledger) if item]
+        return "\n\n".join(parts) if parts else None
 
     lines = [
         "ACCO CONTINUITY CHECKPOINT — structured local state, not a transcript.",
