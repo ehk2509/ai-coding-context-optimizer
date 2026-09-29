@@ -78,3 +78,68 @@ def test_adaptive_discovery_selects_execution_for_data_heavy_task(tmp_path):
 
     assert "execute" in names
     assert len(names) <= 10
+
+
+def test_mcp_execute_file_and_batch_execute(tmp_path, monkeypatch):
+    """MCP should expose reusable scripts and bounded multi-job computation."""
+    monkeypatch.setenv("ACCO_STATE_DIR", str(tmp_path / "state"))
+    (tmp_path / "values.txt").write_text("1\n2\n4\n", encoding="utf-8")
+    (tmp_path / "count.py").write_text(
+        'result = len(data["values.txt"].splitlines())\n',
+        encoding="utf-8",
+    )
+    protocol = McpProtocol(tmp_path, profile="context")
+
+    file_result = json.loads(
+        protocol.call_tool(
+            "execute_file",
+            {
+                "program_file": "count.py",
+                "files": ["values.txt"],
+            },
+        )["content"][0]["text"]
+    )
+    batch_result = json.loads(
+        protocol.call_tool(
+            "batch_execute",
+            {
+                "jobs": [
+                    {
+                        "id": "sum",
+                        "code": (
+                            'result = sum(int(v) for v in '
+                            'data["values.txt"].splitlines())'
+                        ),
+                        "files": ["values.txt"],
+                    }
+                ]
+            },
+        )["content"][0]["text"]
+    )
+
+    assert file_result["result"] == 3
+    assert file_result["program_file"] == "count.py"
+    assert batch_result["results"][0]["result"] == 7
+
+
+def test_mcp_session_search_reads_structured_history(tmp_path, monkeypatch):
+    """MCP memory surface should retrieve ledger events, not transcript bodies."""
+    from acco.efficiency import observe_prompt, start_session
+
+    monkeypatch.setenv("ACCO_STATE_DIR", str(tmp_path / "state"))
+    start_session(tmp_path, session_id="s1", source="startup")
+    observe_prompt(
+        tmp_path,
+        "Prefer the repository service instead of direct reads.",
+        session_id="s1",
+    )
+    protocol = McpProtocol(tmp_path, profile="memory")
+
+    result = protocol.call_tool(
+        "session_search",
+        {"query": "repository service"},
+    )
+    payload = json.loads(result["content"][0]["text"])
+
+    assert payload["count"] >= 1
+    assert any("repository service" in event["summary"] for event in payload["events"])
