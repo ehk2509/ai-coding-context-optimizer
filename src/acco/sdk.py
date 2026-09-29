@@ -19,12 +19,18 @@ from .domain_middleware import (
 from .estimate import estimate_tokens
 from .efficiency.ledger import recent_ledger_events, search_ledger
 from .execution import ExecutionLimits, batch_execute, execute_file, execute_program
+from .cache_ttl import cache_ttl_report
 from .model_routing import route_task
-from .observability import record_framework_operation
+from .observability import (
+    observability_report,
+    prometheus_metrics,
+    record_framework_operation,
+)
+from .output_holdout import output_holdout_report
 from .output import OutputPolicy, OutputPipeline
 from .provider_transform import transform_provider_request
 from .recovery import DEFAULT_CAPACITY_BYTES, RecoveryCapacityError, RecoveryStore
-from .tool_field_learning import record_field_retrieval
+from .tool_field_learning import field_learning_report, record_field_retrieval
 
 
 @dataclass(frozen=True)
@@ -514,6 +520,29 @@ class AccoEngine:
             "last_accessed_at": record.last_accessed_at,
             "access_count": record.access_count,
         }
+
+    def tool_field_learning(self, *, limit: int = 50) -> dict[str, Any]:
+        """Report local learned structured-field importance without field values."""
+        return field_learning_report(self.root, limit=limit)
+
+    def cache_ttl_learning(self) -> dict[str, Any]:
+        """Report provider-observed cache TTL bounds and qualified estimates."""
+        return cache_ttl_report(self.root)
+
+    def output_holdout(self, *, bootstrap_samples: int = 1000) -> dict[str, Any]:
+        """Report measured provider output-token holdout evidence."""
+        return output_holdout_report(
+            self.root,
+            bootstrap_samples=bootstrap_samples,
+        )
+
+    def observability(self, *, days: int = 7) -> dict[str, Any]:
+        """Return provider/framework operational metrics for this project."""
+        return observability_report(self.root, days=days)
+
+    def prometheus(self, *, days: int = 7) -> str:
+        """Return Prometheus text exposition for local ACCO runtime metrics."""
+        return prometheus_metrics(self.root, days=days)
 
     def middleware(self, provider: str) -> AccoMiddleware:
         """Create a provider-bound middleware facade for a custom agent."""
