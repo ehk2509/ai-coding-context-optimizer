@@ -13,6 +13,7 @@ from .browser_context import compress_browser_payload, detect_browser_payload_ki
 from .estimate import estimate_tokens
 from .output.pipeline import process_output
 from .recovery import RecoveryCapacityError, RecoveryStore
+from .tool_field_learning import important_field_names, observe_tool_json
 
 _WORD = re.compile(r"[A-Za-z0-9_./:@-]{2,}")
 _LOG_HINT = re.compile(
@@ -95,24 +96,61 @@ def _contains_terms(value: Any, query_terms: set[str]) -> bool:
     return any(term in rendered for term in query_terms)
 
 
-def _compact_json_value(value: Any, query_terms: set[str], depth: int = 0) -> Any:
+def _compact_json_value(
+    value: Any,
+    query_terms: set[str],
+    depth: int = 0,
+    important_fields: set[str] | None = None,
+) -> Any:
     """Compact large JSON containers while retaining schema and focused samples."""
+    important = important_fields or set()
     if depth >= 4:
-        if isinstance(value, (list, dict)):
-            return {"_acco": {"type": type(value).__name__, "items": len(value)}}
+        if isinstance(value, dict):
+            learned = {
+                str(key): item
+                for key, item in value.items()
+                if str(key) in important
+            }
+            if learned:
+                return {
+                    "_acco": {
+                        "type": "dict",
+                        "items": len(value),
+                        "learned_fields": len(learned),
+                    },
+                    **learned,
+                }
+            return {"_acco": {"type": "dict", "items": len(value)}}
+        if isinstance(value, list):
+            return {"_acco": {"type": "list", "items": len(value)}}
         return value
     if isinstance(value, dict):
         return {
-            str(key): _compact_json_value(item, query_terms, depth + 1)
+            str(key): _compact_json_value(item, query_terms, depth + 1, important)
             for key, item in value.items()
         }
     if isinstance(value, list):
         if len(value) <= 10:
             return [_compact_json_value(item, query_terms, depth + 1) for item in value]
+        learned = [
+            item
+            for item in value
+            if isinstance(item, dict)
+            and any(
+                str(key) in important
+                and item.get(key) not in (None, "", False, [], {})
+                for key in item
+            )
+        ][:4]
         focused = [item for item in value if _contains_terms(item, query_terms)][:6]
-        samples = focused or value[:3]
-        if not focused and len(value) > 3:
-            samples = [*samples, value[-1]]
+        samples: list[Any] = []
+        for item in [*learned, *focused, *value[:3]]:
+            if not any(item == existing for existing in samples):
+                samples.append(item)
+            if len(samples) >= 6:
+                break
+        if not learned and not focused and len(value) > 3 and len(samples) < 6:
+            samples.append(value[-1])
         return {
             "_acco": {
                 "type": "list",
@@ -121,30 +159,40 @@ def _compact_json_value(value: Any, query_terms: set[str], depth: int = 0) -> An
                 "focused": bool(focused),
             },
             "items": [
-                _compact_json_value(item, query_terms, depth + 1)
+                _compact_json_value(item, query_terms, depth + 1, important)
                 for item in samples
             ],
         }
     return value
 
 
-def compact_json_value(value: Any, *, query: str = "") -> Any:
+def compact_json_value(
+    value: Any,
+    *,
+    query: str = "",
+    important_fields: set[str] | None = None,
+) -> Any:
     """Return ACCO's deterministic structural JSON compaction for SDK middleware.
 
     The returned value is JSON-compatible when the input is JSON-compatible.
     This helper performs no persistence by itself; callers that accept a lossy
     result must apply ACCO's normal exact-recovery gate.
     """
-    return _compact_json_value(value, _terms(query))
+    return _compact_json_value(value, _terms(query), important_fields=important_fields)
 
 
-def _compress_json(text: str, query: str) -> tuple[str, dict[str, Any]]:
+def _compress_json(
+    text: str,
+    query: str,
+    *,
+    important_fields: set[str] | None = None,
+) -> tuple[str, dict[str, Any]]:
     """Return a compact structural JSON representation."""
     try:
         value = json.loads(text)
     except (ValueError, TypeError):
         return text, {}
-    compact = compact_json_value(value, query=query)
+    compact = compact_json_value(value, query=query, important_fields=important_fields)
     candidate = json.dumps(compact, ensure_ascii=False, separators=(",", ":")) + "\n"
     return candidate, {"json_root": type(value).__name__}
 
