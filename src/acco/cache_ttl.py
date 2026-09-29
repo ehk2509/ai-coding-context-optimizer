@@ -38,8 +38,12 @@ def record_cache_observation(
             break
 
     idle_seconds = None
-    if isinstance(prior, dict) and isinstance(prior.get("recorded_at"), int):
-        idle_seconds = max(0, timestamp - int(prior["recorded_at"]))
+    if isinstance(prior, dict):
+        prior_time = prior.get("observed_at")
+        if not isinstance(prior_time, int):
+            prior_time = prior.get("recorded_at")
+        if isinstance(prior_time, int):
+            idle_seconds = max(0, timestamp - int(prior_time))
 
     read = max(0, int(cache_read_tokens or 0))
     created = max(0, int(cache_creation_tokens or 0))
@@ -62,6 +66,7 @@ def record_cache_observation(
     event = {
         "kind": "cache_ttl_observation",
         "feature": "provider_cache_ttl",
+        "observed_at": timestamp,
         "provider": normalized_provider,
         "model": normalized_model,
         "epoch_key": epoch,
