@@ -242,6 +242,7 @@ def _transform_content_blocks(
     recovery: RecoveryStore,
     min_tokens: int,
     handles: list[str],
+    tool_names: dict[str, str],
 ) -> tuple[list, int]:
     """Transform Anthropic-style historical tool-result content blocks."""
     out = []
@@ -251,6 +252,12 @@ def _transform_content_blocks(
             out.append(block)
             continue
         updated = dict(block)
+        tool_id = updated.get("tool_use_id")
+        tool_key = (
+            tool_names.get(tool_id, "anthropic-tool")
+            if isinstance(tool_id, str)
+            else "anthropic-tool"
+        )
         content = updated.get("content")
         if isinstance(content, str):
             transformed, handle = _compress_tool_text(
@@ -258,6 +265,7 @@ def _transform_content_blocks(
                 query=query,
                 recovery=recovery,
                 min_tokens=min_tokens,
+                tool_key=tool_key,
             )
             updated["content"] = transformed
             if handle:
@@ -276,6 +284,7 @@ def _transform_content_blocks(
                         query=query,
                         recovery=recovery,
                         min_tokens=min_tokens,
+                        tool_key=tool_key,
                     )
                     item = dict(item)
                     item["text"] = transformed
@@ -295,6 +304,7 @@ def _transform_messages(
     recovery: RecoveryStore,
     min_tokens: int,
     handles: list[str],
+    tool_names: dict[str, str],
 ) -> int:
     """Transform explicit historical tool outputs deterministically."""
     messages = transformed.get("messages")
@@ -315,14 +325,22 @@ def _transform_messages(
                 recovery=recovery,
                 min_tokens=min_tokens,
                 handles=handles,
+                tool_names=tool_names,
             )
             changed += count
         if updated.get("role") == "tool" and isinstance(content, str):
+            tool_id = updated.get("tool_call_id")
+            tool_key = (
+                tool_names.get(tool_id, str(updated.get("name") or "openai-tool"))
+                if isinstance(tool_id, str)
+                else str(updated.get("name") or "openai-tool")
+            )
             updated["content"], handle = _compress_tool_text(
                 content,
                 query=query,
                 recovery=recovery,
                 min_tokens=min_tokens,
+                tool_key=tool_key,
             )
             if handle:
                 handles.append(handle)
@@ -339,6 +357,7 @@ def _transform_openai_input(
     recovery: RecoveryStore,
     min_tokens: int,
     handles: list[str],
+    tool_names: dict[str, str],
 ) -> int:
     """Transform OpenAI Responses historical tool outputs deterministically."""
     input_items = transformed.get("input")
@@ -353,11 +372,18 @@ def _transform_openai_input(
             and isinstance(item.get("output"), str)
         ):
             item = dict(item)
+            call_id = item.get("call_id") or item.get("tool_call_id")
+            tool_key = (
+                tool_names.get(call_id, "openai-response-tool")
+                if isinstance(call_id, str)
+                else "openai-response-tool"
+            )
             item["output"], handle = _compress_tool_text(
                 item["output"],
                 query=query,
                 recovery=recovery,
                 min_tokens=min_tokens,
+                tool_key=tool_key,
             )
             if handle:
                 handles.append(handle)
@@ -385,6 +411,7 @@ def _transform_gemini(
                 query=query,
                 recovery=recovery,
                 min_tokens=min_tokens,
+                tool_key=str(parent.get("name") or "gemini-function"),
             )
             parent[key] = candidate
             if handle:
@@ -400,6 +427,7 @@ def _transform_gemini(
                 query=query,
                 recovery=recovery,
                 min_tokens=min_tokens,
+                tool_key=str(parent.get("name") or "gemini-function"),
             )
             leaf_parent[leaf_key] = candidate
             if handle:
@@ -435,6 +463,7 @@ def transform_provider_request(
     original_tokens = _json_tokens(body)
     transformed = deepcopy(body)
     recovery = RecoveryStore(root, capacity_bytes=recovery_capacity_bytes)
+    tool_names = _tool_name_index(body)
     handles: list[str] = []
     schema_handle = None
     transformed_segments = 0
