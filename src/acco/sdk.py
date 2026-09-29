@@ -185,10 +185,12 @@ class AccoEngine:
         max_lines: int = 120,
         min_tokens: int = 400,
         format_hint: str = "auto",
+        framework: str = "sdk",
     ) -> dict[str, Any]:
         """Optimize caller-supplied browser/DOM/AX context with exact recovery."""
         if not isinstance(text, str):
             raise ValueError("text must be a string")
+        started = time.perf_counter()
         result = compress_browser_payload(
             text,
             query=query,
@@ -197,7 +199,9 @@ class AccoEngine:
             format_hint=format_hint,
             recovery=self.recovery,
         )
-        return {"schema": 1, **result.to_dict()}
+        payload = {"schema": 1, **result.to_dict()}
+        self._observe_framework(framework, "browser.optimize", payload, started)
+        return payload
 
     def optimize_output(
         self,
@@ -209,6 +213,7 @@ class AccoEngine:
         keep_tail: int = 20,
         min_reduction: float = 0.02,
         recoverable: bool = True,
+        framework: str = "sdk",
     ) -> dict[str, Any]:
         """Optimize command output and optionally persist the exact original."""
         if not isinstance(text, str):
@@ -219,6 +224,7 @@ class AccoEngine:
             raise ValueError("keep_tail must be nonnegative")
         if not 0 <= min_reduction < 1:
             raise ValueError("min_reduction must be in [0, 1)")
+        started = time.perf_counter()
         result = self.output_pipeline.process(
             text,
             command,
@@ -251,7 +257,7 @@ class AccoEngine:
                 recovery_handle = None
         changed = candidate != text
         output_tokens = estimate_tokens(candidate)
-        return {
+        payload = {
             "schema": 1,
             "text": candidate,
             "processor": result.processor,
@@ -267,6 +273,8 @@ class AccoEngine:
             "output_tokens": output_tokens if changed else original_tokens,
             "recovery_handle": recovery_handle,
         }
+        self._observe_framework(framework, "output.optimize", payload, started)
+        return payload
 
     def plan_context_budget(
         self,
