@@ -337,6 +337,37 @@ def _handler_factory(
             except HTTPError as exc:
                 response = exc
             except OSError as exc:
+                meta = transformed.metadata
+                request_meta = meta.get("request", {})
+                provider = (
+                    str(request_meta.get("provider") or config.provider)
+                    if isinstance(request_meta, dict)
+                    else config.provider
+                )
+                shape = (
+                    str(request_meta.get("shape") or "unknown")
+                    if isinstance(request_meta, dict)
+                    else "unknown"
+                )
+                try:
+                    record_provider_request(
+                        config.root,
+                        provider=provider,
+                        shape=shape,
+                        model=(
+                            str(meta.get("request_model"))
+                            if meta.get("request_model")
+                            else None
+                        ),
+                        status=502,
+                        latency_ms=(time.perf_counter() - started) * 1000.0,
+                        changed=bool(meta.get("changed")),
+                        original_tokens=int(meta.get("original_tokens", 0) or 0),
+                        output_tokens=int(meta.get("output_tokens", 0) or 0),
+                        recovery_handles=len(meta.get("recovery_handles", [])),
+                    )
+                except (OSError, ValueError):
+                    pass
                 self.send_error(502, f"upstream unavailable: {exc}")
                 return
 
