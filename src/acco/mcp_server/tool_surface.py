@@ -66,7 +66,7 @@ _GROUP_TERMS = {
     "memory": {
         "memory", "remember", "recall", "previous", "prior", "decision",
         "convention", "guardrail", "architecture", "bugfix", "history",
-        "session", "knowledge", "ledger", "timeline", "resume", "previous",
+        "session", "knowledge", "ledger", "timeline", "resume",
     },
     "recovery": {
         "recover", "recovery", "original", "exact", "bytes", "tsr",
