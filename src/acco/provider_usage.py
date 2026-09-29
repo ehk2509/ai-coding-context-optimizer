@@ -197,8 +197,13 @@ class ProviderUsageObserver:
         epoch = prefix.get("epoch_key")
         reuse_mode = prefix.get("reuse_mode")
         model = self._usage.get("model") or self.request_model
+        cache_counter_available = (
+            "cache_read_input_tokens" in self._usage
+            or "cache_creation_input_tokens" in self._usage
+        )
         if (
-            isinstance(epoch, str)
+            cache_counter_available
+            and isinstance(epoch, str)
             and isinstance(reuse_mode, str)
             and isinstance(model, str)
         ):
