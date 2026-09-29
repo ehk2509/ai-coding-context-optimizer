@@ -603,7 +603,7 @@ def continuity_context(
         parts = [guarded]
         if contract:
             parts.append(contract)
-        elif ledger:
+        if ledger:
             parts.append(ledger)
         return "\n\n".join(parts)
     snapshot = load_snapshot(root)
@@ -666,6 +666,9 @@ def continuity_context(
         },
     )
     rendered = "\n".join(lines)
+    parts = [rendered]
     if contract:
-        return rendered + "\n\n" + contract
-    return rendered + ("\n\n" + ledger if ledger else "")
+        parts.append(contract)
+    if ledger:
+        parts.append(ledger)
+    return "\n\n".join(parts)
