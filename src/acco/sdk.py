@@ -77,6 +77,8 @@ class AccoEngine:
         tool_result_min_tokens: int = 800,
         prefix_tracking: bool = True,
         context_budget_total_tokens: int | None = None,
+        provider_cache_mode: str = "plan",
+        provider_cache_expected_reuses: int = 2,
     ) -> dict[str, Any]:
         """Optimize one provider request while keeping exact recovery available."""
         if not isinstance(provider, str) or not provider.strip():
@@ -92,6 +94,8 @@ class AccoEngine:
             recovery_capacity_bytes=self.recovery_capacity_bytes,
             prefix_tracking=prefix_tracking,
             context_budget_total_tokens=context_budget_total_tokens,
+            provider_cache_mode=provider_cache_mode,
+            provider_cache_expected_reuses=provider_cache_expected_reuses,
         )
         return {
             "schema": 1,
