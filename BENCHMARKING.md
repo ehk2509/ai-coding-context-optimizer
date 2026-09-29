@@ -240,13 +240,14 @@ establish lower API cost, coding-task success, or cost per successful task.
 
 ## Automated end-to-end cost-per-success experiment
 
-> **Development evidence (not a publishable claim):** a 144-run paired run of
-> the 24 SWE-bench tasks on a Claude subscription, with each agent inside its
-> task's SWE-bench image, measured ACCO `4856959` at −21.1% cost per success
-> (task-cluster 95% CI 9.7–31.4%) with 55/72 vs 56/72 solved. The suite was not
-> frozen and success was one run lower, so the gate below withholds the
-> headline. See
-> [`benchmarks/e2e-subscription-swebench-24-2026-09-27.md`](benchmarks/e2e-subscription-swebench-24-2026-09-27.md).
+> **Frozen paired evidence:** on the frozen 24-task SWE-bench suite run on a
+> Claude subscription (144 runs, each agent inside its task's SWE-bench image),
+> ACCO `19f17e5` (1.22.1) matched plain Claude Code's success (58/72 vs 58/72)
+> at 26.2% lower equivalent cost per success (task-cluster 95% CI 12.3–37.1%).
+> It passes the publication gate below. Scope: one model, one host, one suite;
+> blind output-quality grading was not run. See
+> [`benchmarks/e2e-swebench-24-subscription.frozen.result.md`](benchmarks/e2e-swebench-24-subscription.frozen.result.md); the earlier unfrozen
+> [development study](benchmarks/e2e-subscription-swebench-24-2026-09-27.md) is superseded.
 
 For evidence that supports a public cost claim, use the executable experiment
 harness rather than hand-assembling a few runs. It exports history-isolated snapshots at pinned revisions, randomizes

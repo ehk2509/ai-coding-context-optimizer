@@ -29,8 +29,16 @@ retrieval-first design:
   rather than frozen and ACCO solved 55/72 runs versus 56/72 for plain Claude
   Code.
 
-The release still makes no universal token, API-cost, or cost-per-success claim;
-see [Validation evidence](VALIDATION.md) and
+**Frozen end-to-end result (ACCO 1.22.1, Claude Code + Sonnet 5):** on a frozen
+24-task SWE-bench Verified suite (3 paired trials per task, 144 runs, hidden-test
+grading), ACCO matched plain Claude Code's success (58/72 vs 58/72) at **26.2%
+lower equivalent API cost per solved task** (task-cluster 95% CI 12.3–37.1%),
+with 26% fewer tokens and 16.5% fewer model calls. This is one model, one host
+and one task suite, not a universal savings figure; see the
+[frozen result](benchmarks/e2e-swebench-24-subscription.frozen.result.md).
+
+ACCO makes no universal token, API-cost, or cost-per-success claim beyond that
+scoped result; see [Validation evidence](VALIDATION.md) and
 [Benchmarking methodology](BENCHMARKING.md).
 
 ## Install

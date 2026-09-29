@@ -1,5 +1,27 @@
 # Validation for 1.23.0
 
+## Frozen paired SWE-bench subscription result (ACCO 1.22.1)
+
+The first end-to-end cost result to pass the `acco benchmark` publication gate
+(`protocol_valid: true`, no issues). Suite
+`benchmarks/e2e-swebench-24-subscription.frozen.json` was frozen and pushed
+before any run: 24 SWE-bench Verified tasks, 3 paired trials per task, 144 runs,
+Claude Code 2.1.276 with `claude-sonnet-5` on a Claude subscription, each agent
+inside its task's official SWE-bench image, hidden-test grading.
+
+| | Plain Claude Code | ACCO `19f17e5` (1.22.1) |
+|---|---:|---:|
+| Solved | 58/72 | 58/72 |
+| Cost per solved task (equivalent API) | $0.541 | $0.400 (−26.2%) |
+| Total tokens | 77.6M | 57.3M (−26.1%) |
+| Model calls | 1,567 | 1,309 (−16.5%) |
+
+Task-cluster 95% CI for the cost-per-success reduction: **12.3% to 37.1%**;
+success-rate change −5.6 to +5.6 points. Scope limits: one model, one host, one
+suite; features added after `19f17e5` (1.23.0 native hooks and out-of-context
+execution) are not measured; blind output-quality grading was not run. Details:
+`benchmarks/e2e-swebench-24-subscription.frozen.result.md`.
+
 ## 1.23 out-of-context execution and native host interception
 
 Version 1.23 expands ACCO's runtime context-control boundary without replacing
@@ -38,7 +60,8 @@ The 144-run paired SWE-bench subscription study is retained as
 fewer model calls, and 21.1% lower equivalent cost per successful task. The
 suite had been adapted for local subscription/task-image execution rather than
 frozen before evaluation, and success was one run lower in the ACCO arm.
-**No 144-run aggregate savings claim** is therefore made for 1.23.0.
+**No aggregate savings claim is made from that study**; the frozen
+re-run above supersedes it.
 
 The new native-hook and execution features were added after that experiment, so
 the study also does not establish their incremental end-to-end benefit. A fresh
