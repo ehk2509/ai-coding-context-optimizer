@@ -157,10 +157,13 @@ class AccoEngine:
         command: str = "",
         max_lines: int = 120,
         min_reduction: float = 0.08,
+        tool_key: str = "sdk-context",
+        framework: str = "sdk",
     ) -> dict[str, Any]:
         """Compress arbitrary agent/tool context with exact-source recovery."""
         if not isinstance(text, str):
             raise ValueError("text must be a string")
+        started = time.perf_counter()
         result = route_context(
             text,
             query=query,
@@ -168,8 +171,11 @@ class AccoEngine:
             command=command,
             max_lines=max_lines,
             min_reduction=min_reduction,
+            tool_key=tool_key,
         )
-        return {"schema": 1, **result.to_dict()}
+        payload = {"schema": 1, **result.to_dict()}
+        self._observe_framework(framework, "context.optimize", payload, started)
+        return payload
 
     def optimize_browser_context(
         self,
