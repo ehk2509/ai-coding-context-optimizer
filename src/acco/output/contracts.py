@@ -1,14 +1,25 @@
-"""Stable contracts for command-output optimization.
-
-The output package keeps transformation implementations behind small protocols so
-routing and orchestration can be tested or extended without importing concrete
-processors.
-"""
+"""Stable contracts for command/content optimization."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import IntEnum
 from typing import Protocol
+
+
+class SafetyClass(IntEnum):
+    """Describe how much information a transform may discard."""
+
+    S0_EXACT = 0
+    S1_COSMETIC = 1
+    S2_STRUCTURAL_LOSSLESS = 2
+    S3_BOUNDED_SELECTIVE = 3
+    S4_LOSSY_RECOVERABLE = 4
+
+    @property
+    def requires_recovery(self) -> bool:
+        """Return whether accepting this class requires exact source recovery."""
+        return self >= SafetyClass.S3_BOUNDED_SELECTIVE
 
 
 @dataclass(frozen=True)
@@ -20,6 +31,14 @@ class OutputResult:
     compressed: bool
     failed: bool
     recovered_lines: tuple[str, ...] = ()
+    content_kind: str = "text"
+    safety_class: SafetyClass = SafetyClass.S4_LOSSY_RECOVERABLE
+    validation: str = "not-run"
+
+    @property
+    def requires_recovery(self) -> bool:
+        """Return whether this accepted transform must keep exact source bytes."""
+        return self.compressed and self.safety_class.requires_recovery
 
 
 @dataclass(frozen=True)
@@ -32,14 +51,14 @@ class OutputPolicy:
 
 
 class OutputProcessor(Protocol):
-    """Transform output for one recognized command family."""
+    """Transform output for one recognized command/content family."""
 
     name: str
     priority: int
     handles_failure: bool
 
     def matches(self, command: str) -> bool:
-        """Return whether this processor recognizes ``command``."""
+        """Return whether this processor recognizes command."""
         ...
 
     def compress(
@@ -51,5 +70,5 @@ class OutputProcessor(Protocol):
         max_lines: int,
         keep_tail: int,
     ) -> str:
-        """Return a conservative transformed representation of ``text``."""
+        """Return a conservative transformed representation of text."""
         ...

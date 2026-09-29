@@ -77,6 +77,8 @@ class AccoEngine:
         tool_result_min_tokens: int = 800,
         prefix_tracking: bool = True,
         context_budget_total_tokens: int | None = None,
+        provider_cache_mode: str = "plan",
+        provider_cache_expected_reuses: int = 2,
     ) -> dict[str, Any]:
         """Optimize one provider request while keeping exact recovery available."""
         if not isinstance(provider, str) or not provider.strip():
@@ -92,6 +94,8 @@ class AccoEngine:
             recovery_capacity_bytes=self.recovery_capacity_bytes,
             prefix_tracking=prefix_tracking,
             context_budget_total_tokens=context_budget_total_tokens,
+            provider_cache_mode=provider_cache_mode,
+            provider_cache_expected_reuses=provider_cache_expected_reuses,
         )
         return {
             "schema": 1,
@@ -176,7 +180,9 @@ class AccoEngine:
         original_tokens = estimate_tokens(text)
         candidate = result.text
         recovery_handle = None
-        if result.compressed and recoverable:
+        if result.requires_recovery and not recoverable:
+            candidate = text
+        elif result.compressed and recoverable:
             try:
                 recovery_handle = self.recovery.put(
                     text,
@@ -184,6 +190,8 @@ class AccoEngine:
                     metadata={
                         "transform": "sdk-output",
                         "processor": result.processor,
+                        "content_kind": result.content_kind,
+                        "safety_class": result.safety_class.name,
                     },
                 )
             except RecoveryCapacityError:
@@ -195,6 +203,10 @@ class AccoEngine:
             "schema": 1,
             "text": candidate,
             "processor": result.processor,
+            "content_kind": result.content_kind,
+            "safety_class": result.safety_class.name,
+            "validation": result.validation,
+            "requires_recovery": result.safety_class.requires_recovery,
             "changed": changed,
             "compressed": changed,
             "failed": result.failed,
@@ -390,8 +402,19 @@ class AccoEngine:
         )
         return {"schema": 1, "count": len(events), "events": events}
 
-    def recover(self, handle: str) -> dict[str, Any]:
-        """Recover exact stored bytes using a content-addressed recovery handle."""
+    def recover(
+        self,
+        handle: str,
+        *,
+        pointer: str | None = None,
+    ) -> dict[str, Any]:
+        """Recover exact bytes or one typed-object JSON-Pointer subtree."""
+        if handle.startswith("tsr_obj_") or handle.startswith("tsr://"):
+            return {
+                "schema": 1,
+                "kind": "object",
+                **self.recovery.select(handle, pointer),
+            }
         record = self.recovery.get(handle)
         try:
             text = record.payload.decode("utf-8")
@@ -402,6 +425,7 @@ class AccoEngine:
             encoding = "base64"
         return {
             "schema": 1,
+            "kind": "bytes",
             "handle": record.handle,
             "content_type": record.content_type,
             "encoding": encoding,

@@ -54,6 +54,8 @@ class ProviderProxyConfig:
     model_routing_min_savings: float = 0.05
     instance_id: str = ""
     context_budget_total_tokens: int | None = None
+    provider_cache_mode: str = "plan"
+    provider_cache_expected_reuses: int = 2
 
     def validate(self) -> ProviderProxyConfig:
         """Reject unsafe binding/upstream combinations before serving."""
@@ -100,6 +102,13 @@ class ProviderProxyConfig:
             and int(self.context_budget_total_tokens) < 1000
         ):
             raise ValueError("context budget total tokens must be at least 1000")
+        if self.provider_cache_mode.strip().lower() not in {"off", "plan", "apply"}:
+            raise ValueError("provider_cache_mode must be one of: off, plan, apply")
+        if (
+            isinstance(self.provider_cache_expected_reuses, bool)
+            or int(self.provider_cache_expected_reuses) < 0
+        ):
+            raise ValueError("provider_cache_expected_reuses must be nonnegative")
         return self
 
 
@@ -156,6 +165,8 @@ def transform_request_bytes(
         model_routing_calibration_file=config.model_routing_calibration_file,
         model_routing_min_savings=config.model_routing_min_savings,
         context_budget_total_tokens=config.context_budget_total_tokens,
+        provider_cache_mode=config.provider_cache_mode,
+        provider_cache_expected_reuses=config.provider_cache_expected_reuses,
     )
     encoded = (
         json.dumps(

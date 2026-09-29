@@ -63,6 +63,33 @@ This remains separate from durable project knowledge: the ledger records what
 happened during work, while finding/memory stores represent conclusions the
 agent explicitly chose to preserve.
 
+The current development branch also deepens five runtime foundations:
+
+- **Recovery Store v2:** exact byte handles now coexist with typed
+  `tsr_obj_...` objects and JSON-Pointer subtree recovery. Existing v1 recovery
+  databases migrate in place; digests are checked on retrieval and capacity
+  still fails closed without evicting live handles.
+- **Formal compression safety contracts:** payloads are classified independently
+  of their command, assigned an S0-S4 safety class, and format invariants are
+  checked before a smaller representation is accepted. Selective/lossy output
+  requires exact recovery.
+- **Warm native hook runtime:** real CLI hook traffic can reuse a private
+  authenticated project-local loopback runtime instead of rebuilding
+  HookRuntime on every event. Startup and transport failure fall back to the
+  existing direct path; timeouts fail open without replaying side effects.
+- **Provider cache economics:** prefix tracking is now conversation-epoch aware
+  so interleaved agents/subagents do not share one false cache anchor. ACCO
+  separates planned cache economics from provider-observed cache counters and
+  can opt into safe Anthropic-style cache breakpoints.
+- **Task Contract reconstruction:** resume state combines current task goal,
+  explicit decisions, working files, unresolved failures, validation state and
+  named checks with relevance-ranked older ledger evidence. A passing validator
+  resolves only failures from the same validation family.
+
+These mechanisms are new engineering surfaces, not new savings claims. The
+frozen 1.22.1 end-to-end result above remains the current publishable
+cost-per-success evidence until a fresh frozen experiment exercises them.
+
 ## Install
 
 ### Fast path

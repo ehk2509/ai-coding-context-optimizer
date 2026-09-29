@@ -55,6 +55,7 @@ acco.batch_execute([
 acco.session_search("why did we choose SQLite?")
 acco.session_recent(limit=10)
 acco.recover("tsr_...")
+acco.recover("tsr_obj_...", pointer="/failures/0")
 ```
 
 ### Python middleware lifecycle
@@ -67,8 +68,8 @@ acco.recover("tsr_...")
 - `after_browser_result(text, ...)` explicitly focuses captured HTML, AX, or browser-JSON payloads when the host already knows a result came from a browser tool;
 - `route(prompt, **options)` returns a deterministic model-routing decision
   for orchestrators that can choose a model;
-- `recover(handle)` returns the exact source bytes represented by an accepted
-  lossy transform.
+- `recover(handle, pointer=...)` returns exact byte recovery for `tsr_...`
+  handles or a selected RFC 6901 subtree for typed `tsr_obj_...` records.
 
 The middleware does not send requests to a provider. Your agent remains in
 control of provider authentication, retries, streaming, and model execution.
@@ -274,6 +275,37 @@ the equivalent `session_search` and `session_recent` tools. Resume/compaction
 continuity can append a small recent-event packet automatically, while deeper
 history stays out of context until explicitly searched.
 
+## Provider cache planning
+
+Provider request optimization can now return a content-free cache plan alongside
+the normal transform metadata:
+
+```python
+prepared = acco.optimize_provider_request(
+    "anthropic",
+    body,
+    provider_cache_mode="plan",       # off | plan | apply
+    provider_cache_expected_reuses=3,
+)
+
+plan = prepared["cache_plan"]
+```
+
+The plan reports stable-prefix size, expected reuse count, relative cost
+assumptions, break-even reuse, strategy, conversation epoch and eligibility. It
+is **planning evidence**, not proof of a provider cache hit. Provider response
+usage counters remain the observed evidence.
+
+`provider_cache_mode="apply"` currently performs only conservative inline
+mutation that ACCO can express safely: an Anthropic/Bedrock cache-control
+breakpoint on an existing tool or block-form system surface. OpenAI automatic
+prompt caching requires no request mutation; Gemini explicit cached-content
+resource lifecycle remains caller-owned.
+
+Stable-prefix reuse is tracked per bounded conversation epoch derived from the
+stable system/instructions/tool surface, preventing interleaved agents or
+subagents from overwriting one provider-wide prefix anchor.
+
 ## Whole-context planning
 
 Custom agents can ask ACCO to allocate one total context envelope before they
@@ -390,7 +422,7 @@ The bridge exposes only versioned JSON endpoints:
 | `POST` | `/v1/execute` | restricted computation over repository-local text files |
 | `POST` | `/v1/context-budget` | deterministic whole-context allocation |
 | `POST` | `/v1/route` | deterministic model-routing decision |
-| `POST` | `/v1/recover` | exact recovery by `tsr_...` handle |
+| `POST` | `/v1/recover` | exact byte recovery or typed JSON-Pointer subtree recovery |
 
 The request limit is 32 MiB. The service returns JSON only and does not log
 request bodies.
@@ -401,8 +433,9 @@ The SDK does not weaken ACCO's existing transformation rules:
 
 1. A provider/context transform is accepted only when the result is smaller.
 2. Lossy context/provider transformations require exact local recovery first.
-3. SDK output compression with `recoverable=true` also fails open to the
-   original text if the recovery store has insufficient capacity.
+3. SDK output compression declares a formal S0-S4 safety class. Selective or
+   lossy accepted output requires recovery; disabling recovery makes that output
+   path keep the original text. Recovery-capacity failure also keeps the original.
 4. Browser optimization is local and caller-supplied only: it does not navigate, fetch URLs, execute page code, or process screenshot pixels. Ordinary JSON stays on the general context path.
 5. Structured RAG/API/database middleware operates only on caller-supplied in-memory JSON-compatible data and does not retrieve, fetch, connect, or execute queries.
 6. Programmable execution is limited to explicit repository-contained text inputs and a restricted Python surface; it is not a hardened hostile-code sandbox.

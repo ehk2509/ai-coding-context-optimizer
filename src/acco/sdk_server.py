@@ -255,8 +255,11 @@ class SdkApplication:
             handle = body.get("handle")
             if not isinstance(handle, str):
                 raise ValueError("handle must be a string")
+            pointer = body.get("pointer")
+            if pointer is not None and not isinstance(pointer, str):
+                raise ValueError("pointer must be a string")
             try:
-                return 200, self.engine.recover(handle)
+                return 200, self.engine.recover(handle, pointer=pointer)
             except KeyError:
                 return 404, {"error": "recovery_not_found", "handle": handle}
 

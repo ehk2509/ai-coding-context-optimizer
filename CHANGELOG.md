@@ -1,5 +1,34 @@
 # Unreleased
 
+- **Hardened exact recovery into Recovery Store v2.** Existing byte-exact
+  `tsr_...` records migrate in place and now carry verified full digests,
+  access metadata, dependency edges and integrity checks. Typed canonical-JSON
+  `tsr_obj_...` records support selective RFC 6901 subtree recovery without
+  forcing the entire recovered object back into model context. Capacity remains
+  no-eviction/fail-closed.
+- **Formalized compression safety contracts.** Output processing now classifies
+  payload content independently from its command, assigns S0-S4 safety classes,
+  validates JSON/diff/table/source invariants before accepting a transform, and
+  exposes the recovery requirement in SDK/output metadata. Lossy SDK output is
+  refused when recovery is disabled.
+- **Added a warm project-scoped native hook runtime.** Real CLI hook traffic can
+  transparently reuse one authenticated loopback HookRuntime across host
+  events. Requests are project-bound, size-bounded and content-silent in logs;
+  stale endpoints are discarded, configuration changes rebuild the cached
+  runtime, and transport/startup failure falls back to direct execution.
+- **Added provider-native cache planning with conversation epochs.** Stable
+  prefix state is separated across interleaved system/tool surfaces, planned
+  cache economics are stored separately from provider-observed cache counters,
+  and opt-in application can add a conservative Anthropic/Bedrock cache
+  breakpoint without mutating automatic OpenAI or explicit-resource Gemini
+  caching.
+- **Added Task Contract session reconstruction.** Bounded task goals,
+  decisions/constraints, working files, failures, validation state and named
+  checks are combined with relevance-ranked older session-ledger evidence on
+  resume. Passing validation only resolves failures from the matching
+  validation family; remembered state remains explicitly subordinate to live
+  repository/test evidence.
+
 - **Expanded out-of-context compute into reusable and batched execution.**
   Repository-contained restricted programs can run through `execute_file`, and
   `batch_execute` runs up to eight preflighted jobs under aggregate input/time/

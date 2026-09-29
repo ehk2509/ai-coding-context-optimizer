@@ -1,6 +1,7 @@
 """Composable command-output optimization subsystem."""
 
-from .contracts import OutputPolicy, OutputProcessor, OutputResult
+from .content_engine import ContentProfile, detect_content, validate_candidate
+from .contracts import OutputPolicy, OutputProcessor, OutputResult, SafetyClass
 from .pipeline import OutputPipeline, detect_failure, explain_processor, process_output
 from .processors import (
     GenericProcessor,
@@ -28,14 +29,18 @@ __all__ = [
     "OutputPolicy",
     "OutputProcessor",
     "OutputResult",
+    "SafetyClass",
+    "ContentProfile",
     "PackageInstallProcessor",
     "ProcessorRegistry",
     "PytestProcessor",
     "default_processors",
     "detect_failure",
+    "detect_content",
     "explain_processor",
     "filter_text",
     "preprocess",
     "process_output",
     "recover_critical_lines",
+    "validate_candidate",
 ]
