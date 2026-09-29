@@ -100,19 +100,22 @@ def observe_tool_json(root: Path, tool: str, value: Any) -> int:
         return 0
     key = normalize_tool_key(tool)
     now = int(time.time())
-    with closing(_connect(root)) as connection:
-        for field_path in fields:
-            connection.execute(
-                """
-                INSERT INTO field_stats(tool_key, field_path, exposures, retrievals, last_seen)
-                VALUES (?, ?, 1, 0, ?)
-                ON CONFLICT(tool_key, field_path) DO UPDATE SET
-                    exposures = exposures + 1,
-                    last_seen = excluded.last_seen
-                """,
-                (key, field_path, now),
-            )
-        connection.commit()
+    try:
+        with closing(_connect(root)) as connection:
+            for field_path in fields:
+                connection.execute(
+                    """
+                    INSERT INTO field_stats(tool_key, field_path, exposures, retrievals, last_seen)
+                    VALUES (?, ?, 1, 0, ?)
+                    ON CONFLICT(tool_key, field_path) DO UPDATE SET
+                        exposures = exposures + 1,
+                        last_seen = excluded.last_seen
+                    """,
+                    (key, field_path, now),
+                )
+            connection.commit()
+    except sqlite3.Error:
+        return 0
     return len(fields)
 
 
@@ -140,18 +143,21 @@ def record_field_retrieval(root: Path, tool: str, pointer: str) -> int:
     key = normalize_tool_key(tool)
     now = int(time.time())
     updated = 0
-    with closing(_connect(root)) as connection:
-        for field_path in candidates:
-            cursor = connection.execute(
-                """
-                UPDATE field_stats
-                SET retrievals = retrievals + 1, last_seen = ?
-                WHERE tool_key = ? AND field_path = ?
-                """,
-                (now, key, field_path),
-            )
-            updated += int(cursor.rowcount or 0)
-        connection.commit()
+    try:
+        with closing(_connect(root)) as connection:
+            for field_path in candidates:
+                cursor = connection.execute(
+                    """
+                    UPDATE field_stats
+                    SET retrievals = retrievals + 1, last_seen = ?
+                    WHERE tool_key = ? AND field_path = ?
+                    """,
+                    (now, key, field_path),
+                )
+                updated += int(cursor.rowcount or 0)
+            connection.commit()
+    except sqlite3.Error:
+        return 0
     return updated
 
 
@@ -170,17 +176,20 @@ def field_hints(
     if not 0 <= min_confidence <= 1:
         raise ValueError("min_confidence must be between 0 and 1")
     key = normalize_tool_key(tool)
-    with closing(_connect(root)) as connection:
-        rows = connection.execute(
-            """
-            SELECT field_path, exposures, retrievals, last_seen
-            FROM field_stats
-            WHERE tool_key = ? AND exposures >= ? AND retrievals >= ?
-            ORDER BY retrievals DESC, exposures DESC, field_path ASC
-            LIMIT ?
-            """,
-            (key, int(min_exposures), int(min_retrievals), int(limit * 4)),
-        ).fetchall()
+    try:
+        with closing(_connect(root)) as connection:
+            rows = connection.execute(
+                """
+                SELECT field_path, exposures, retrievals, last_seen
+                FROM field_stats
+                WHERE tool_key = ? AND exposures >= ? AND retrievals >= ?
+                ORDER BY retrievals DESC, exposures DESC, field_path ASC
+                LIMIT ?
+                """,
+                (key, int(min_exposures), int(min_retrievals), int(limit * 4)),
+            ).fetchall()
+    except sqlite3.Error:
+        return []
     hints: list[dict[str, Any]] = []
     for row in rows:
         exposures = max(1, int(row["exposures"]))
