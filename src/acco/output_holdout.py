@@ -186,14 +186,15 @@ def apply_output_holdout(
         original_limit=current,
         shaped_limit=shaped,
     )
-    append_event(
-        root,
-        {
-            "kind": "output_holdout_assignment",
-            "feature": "output_shaping",
-            **decision.to_dict(),
-        },
-    )
+    if enabled:
+        append_event(
+            root,
+            {
+                "kind": "output_holdout_assignment",
+                "feature": "output_shaping",
+                **decision.to_dict(),
+            },
+        )
     return decision
 
 
