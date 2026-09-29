@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 
+from .content_engine import detect_content, validate_candidate
 from .contracts import OutputPolicy, OutputResult
 from .registry import DEFAULT_REGISTRY, ProcessorRegistry
 from .text import recover_critical_lines, strip_ansi
@@ -39,7 +40,15 @@ class OutputPipeline:
         """Optimize one captured stdout payload under ``policy``."""
         active_policy = policy or OutputPolicy()
         if not text:
-            return OutputResult(text, "none", False, False)
+            return OutputResult(
+                text,
+                "none",
+                False,
+                False,
+                content_kind="empty",
+                validation="unchanged",
+            )
+        profile = detect_content(text)
         failed = detect_failure(text, exit_code)
         processor = self.registry.select(
             command,
@@ -54,6 +63,10 @@ class OutputPipeline:
             keep_tail=active_policy.keep_tail,
         )
         candidate, recovered = recover_critical_lines(text, candidate)
+        valid, validation = validate_candidate(text, candidate, profile)
+        if not valid:
+            candidate = text
+            recovered = ()
 
         original_bytes = len(text.encode())
         candidate_bytes = len(candidate.encode())
@@ -74,6 +87,9 @@ class OutputPipeline:
             candidate != text,
             failed,
             recovered,
+            content_kind=profile.kind,
+            safety_class=profile.safety_class,
+            validation=validation if candidate != text else "unchanged",
         )
 
     def explain(
@@ -95,10 +111,14 @@ class OutputPipeline:
             for item in self.registry.processors
             if item.matches(command) and failed and not item.handles_failure
         ]
+        profile = detect_content(sample)
         return {
             "command": command,
             "processor": processor.name,
             "failed": failed,
+            "content_kind": profile.kind,
+            "safety_class": profile.safety_class.name,
+            "requires_recovery": profile.safety_class.requires_recovery,
             "handles_failure": processor.handles_failure,
             "failure_skipped_processors": skipped,
         }
