@@ -123,6 +123,32 @@ export class AccoClient {
     });
   }
 
+  executeFile(programFile, files, options = {}) {
+    return this.request("POST", "/v1/execute-file", {
+      program_file: programFile,
+      files,
+      options,
+    });
+  }
+
+  batchExecute(jobs, options = {}) {
+    return this.request("POST", "/v1/batch-execute", {
+      jobs,
+      options,
+    });
+  }
+
+  sessionSearch(query, options = {}) {
+    return this.request("POST", "/v1/session/search", {
+      query,
+      ...options,
+    });
+  }
+
+  sessionRecent(options = {}) {
+    return this.request("POST", "/v1/session/recent", options);
+  }
+
   planContextBudget(prompt, totalTokens, options = {}) {
     return this.request("POST", "/v1/context-budget", {
       prompt,
