@@ -573,13 +573,20 @@ def adapt_response(host: str, event: str, response: dict | None) -> dict:
     raise ValueError(f"unsupported native hook host: {host}")
 
 
-def run_native_hook(host: str, event: str, payload: dict) -> dict:
-    """Run one native host event through ACCO's existing policy runtime."""
+def _run_native_hook_with_runtime(
+    host: str,
+    event: str,
+    payload: dict,
+    *,
+    runtime=None,
+) -> dict:
+    """Run one event with a supplied warm runtime or construct it directly."""
     from .hook import build_hook_runtime
     from .hook_runtime import HookRuntime
 
     normalized = normalize_payload(host, event, payload)
-    runtime = build_hook_runtime(Path(normalized["cwd"]))
+    if runtime is None:
+        runtime = build_hook_runtime(Path(normalized["cwd"]))
 
     if normalized["hook_event_name"] == "PostToolUse" and host in {
         "gemini",
@@ -612,6 +619,26 @@ def run_native_hook(host: str, event: str, payload: dict) -> dict:
 
     _code, response = runtime.run(normalized)
     return adapt_response(host, event, response)
+
+
+def run_native_hook(host: str, event: str, payload: dict) -> dict:
+    """Use the warm local runtime when available, with fail-open direct fallback."""
+    root = Path(_project_root(payload)).resolve()
+    try:
+        from .native_runtime import ensure_runtime_process, request_native_event
+
+        status, response = request_native_event(root, host, event, payload)
+        if status == "ok" and response is not None:
+            return response
+        if status == "timeout":
+            # The warm runtime may already have recorded this event. Do not replay
+            # side effects through a second direct invocation.
+            return {}
+        ensure_runtime_process(root)
+    except Exception:
+        # The runtime is an optimization layer, never a correctness dependency.
+        pass
+    return _run_native_hook_with_runtime(host, event, payload)
 
 
 def main(host: str, event: str) -> int:
