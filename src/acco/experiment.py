@@ -981,7 +981,11 @@ def run_experiment(
                     else None
                 )
                 runtime_activation = (
-                    collect_runtime_activation(worktree, transcript)
+                    collect_runtime_activation(
+                        worktree,
+                        transcript,
+                        state_root=run_state_dir,
+                    )
                     if instrumented
                     else None
                 )
