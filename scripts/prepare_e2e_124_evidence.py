@@ -56,6 +56,9 @@ def _normalize_runner(suite: dict, *, commit: str, image: str) -> None:
     command, image_index = _agent_image_arg(runner)
     command[image_index] = image
     runner["agent_image"] = image
+    # claude_docker mounts the task snapshot at /testbed; ACCO's project-scoped
+    # state keys hash that child-side path, so evidence collection must use it.
+    runner["runtime_state_project_root"] = "/testbed"
     profiles = runner.get("condition_profiles")
     if not isinstance(profiles, dict):
         profiles = {
