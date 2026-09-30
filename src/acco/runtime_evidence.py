@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from .cache_ttl import cache_ttl_report
-from .efficiency.store import load_events
+from .efficiency.store import load_events, load_snapshot
 from .observability import observability_report
 from .recovery import RecoveryStore, recovery_path
 from .sessions import analyze
@@ -61,6 +61,16 @@ def collect_runtime_activation(
         fields = field_learning_report(project_root)
         cache = cache_ttl_report(project_root)
         observability = observability_report(project_root, days=3650)
+        snapshot = load_snapshot(project_root)
+        sessions = snapshot.get("sessions")
+        sessions = sessions if isinstance(sessions, dict) else {}
+        task_contract_sessions = sum(
+            1
+            for session in sessions.values()
+            if isinstance(session, dict)
+            and isinstance(session.get("contract"), dict)
+            and bool(session.get("contract"))
+        )
 
         surface_activity = {
             "recovery_v2": int(recovery.get("records", 0) or 0) > 0,
@@ -79,11 +89,10 @@ def collect_runtime_activation(
                 or name.endswith("batch_execute")
                 for name in tool_calls
             ),
-            "task_contract": any("task_contract" in kind for kind in event_kinds),
-            "session_continuity": any(
-                token in kind
-                for kind in event_kinds
-                for token in ("session_", "continuity", "checkpoint", "guardian")
+            "task_contract": task_contract_sessions > 0,
+            "session_continuity": (
+                event_kinds.get("continuity", 0) > 0
+                or event_kinds.get("guardian", 0) > 0
             ),
         }
 
@@ -95,6 +104,10 @@ def collect_runtime_activation(
             "tool_fields": fields,
             "cache_ttl": cache,
             "observability": observability,
+            "session_state": {
+                "tracked_sessions": len(sessions),
+                "task_contract_sessions": task_contract_sessions,
+            },
             "surface_activity": surface_activity,
             "any_activity": bool(events)
             or bool(tool_calls)
