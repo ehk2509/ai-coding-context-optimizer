@@ -1,6 +1,6 @@
 {
   "name": "@acco-ai/sdk",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Typed middleware client for embedding ACCO optimization in custom JavaScript and TypeScript agents.",
   "type": "module",
   "main": "./dist/index.js",
