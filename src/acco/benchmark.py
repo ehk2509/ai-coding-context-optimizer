@@ -11,6 +11,7 @@ from pathlib import Path
 
 from .cost_report import Run, compare_costs
 from .pricing import cost, load_rates
+from .runtime_evidence import aggregate_runtime_activation
 from .sessions import analyze
 
 MIN_PUBLISHABLE_TASKS = 20
@@ -345,6 +346,7 @@ def evaluate(
             "statistically_supported_cost_per_success_reduction": statistically_supported,
             "minimum_publishable_tasks": MIN_PUBLISHABLE_TASKS,
             "minimum_publishable_trials_per_task": MIN_PUBLISHABLE_TRIALS_PER_TASK,
+            "runtime_activation": aggregate_runtime_activation(runs),
         },
         "note": (
             "Costs come from measured transcripts and include failed runs. "
