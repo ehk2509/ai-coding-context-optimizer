@@ -23,6 +23,12 @@ acco benchmark <manifest> [--rates FILE] [--require-publishable] [--print-task-d
 
 JSON when evaluating; a single hash when printing the task-definition hash. See [Machine-readable contracts](../JSON_OUTPUTS.md#legacy-benchmark-always-json).
 
+When experiment runs contain ACCO 1.24 runtime evidence, the JSON result also
+includes `evidence.runtime_activation`: enabled-run coverage, raw event/tool
+counts, and the number of runs in which each measured runtime surface was
+actually active. Activation is reported separately from cost-per-success and
+does not create a causal feature claim.
+
 ## Authoritative runtime help
 
 Run `acco benchmark --help` for argparse's exact usage text for the installed version.
