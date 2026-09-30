@@ -23,6 +23,7 @@ from .benchmark import (
 from .install import HOOK_COMMAND, install, user_settings_path
 from .output_telemetry import load_output_telemetry_from_state
 from .session_metrics import efficiency_event_metrics, transcript_session_metrics
+from .runtime_evidence import collect_runtime_activation
 from .sessions import analyze, transcript_paths
 
 CONDITIONS = ("baseline", "enabled")
@@ -979,6 +980,11 @@ def run_experiment(
                     if instrumented
                     else None
                 )
+                runtime_activation = (
+                    collect_runtime_activation(worktree, transcript)
+                    if instrumented
+                    else None
+                )
 
                 # Remove benchmark instrumentation before capturing the solution.
                 # Hooks, settings, lock files, MCP config and skills written for
@@ -1133,6 +1139,7 @@ def run_experiment(
                     "output_policy_telemetry": policy_telemetry,
                     "session_metrics": session_metrics,
                     "session_efficiency_telemetry": efficiency_telemetry,
+                    "runtime_activation": runtime_activation,
                     "agent_exit_code": agent_rc,
                     "verification": verification,
                     "agent_patch": str(agent_patch.relative_to(output_path.parent)),
