@@ -1,5 +1,7 @@
 # Unreleased
 
+# 1.24.0 - 2026-09-30
+
 - **Added local learned tool-field importance.** Structured JSON tool outputs can
   learn from selective recovery: ACCO persists only bounded tool identities,
   structural field paths, exposure counts, and retrieval counts, then uses
