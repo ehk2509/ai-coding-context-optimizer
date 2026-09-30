@@ -208,7 +208,7 @@ def main() -> int:
     validation_dir = args.validation_dir or Path(tempfile.mkdtemp(prefix="acco-gold-"))
     selected: list[dict] = []
     rejected: list[dict] = []
-    cursor = {repo_id: 0 for repo_id in pools}
+    cursor = dict.fromkeys(pools, 0)
     while len(selected) < args.tasks:
         progressed = False
         for repo_id in sorted(pools):
