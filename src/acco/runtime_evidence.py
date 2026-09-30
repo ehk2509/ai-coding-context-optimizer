@@ -20,12 +20,14 @@ def collect_runtime_activation(
     transcript: Path,
     *,
     state_root: Path,
+    state_project_root: Path | None = None,
 ) -> dict[str, Any]:
     """Collect content-free evidence that ACCO runtime mechanisms actually fired."""
+    project_root = (state_project_root or root).resolve()
     previous_state = os.environ.get("ACCO_STATE_DIR")
     os.environ["ACCO_STATE_DIR"] = str(state_root)
     try:
-        events = load_events(root)
+        events = load_events(project_root)
         event_kinds = Counter(
             str(event.get("kind") or "unknown")
             for event in events
@@ -49,16 +51,16 @@ def collect_runtime_activation(
             "dependencies": 0,
             "used_bytes": 0,
         }
-        if recovery_path(root).is_file():
+        if recovery_path(project_root).is_file():
             recovery = {
                 key: value
-                for key, value in RecoveryStore(root).stats().items()
+                for key, value in RecoveryStore(project_root).stats().items()
                 if key != "path"
             }
 
-        fields = field_learning_report(root)
-        cache = cache_ttl_report(root)
-        observability = observability_report(root, days=3650)
+        fields = field_learning_report(project_root)
+        cache = cache_ttl_report(project_root)
+        observability = observability_report(project_root, days=3650)
 
         surface_activity = {
             "recovery_v2": int(recovery.get("records", 0) or 0) > 0,
