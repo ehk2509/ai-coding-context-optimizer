@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
+import os
 from pathlib import Path
 from typing import Any
 
@@ -14,83 +15,99 @@ from .sessions import analyze
 from .tool_field_learning import field_learning_report
 
 
-def collect_runtime_activation(root: Path, transcript: Path) -> dict[str, Any]:
+def collect_runtime_activation(
+    root: Path,
+    transcript: Path,
+    *,
+    state_root: Path,
+) -> dict[str, Any]:
     """Collect content-free evidence that ACCO runtime mechanisms actually fired."""
-    events = load_events(root)
-    event_kinds = Counter(
-        str(event.get("kind") or "unknown")
-        for event in events
-        if isinstance(event, dict)
-    )
-    report = analyze([transcript], keep_content=False)
-    tool_calls = Counter(
-        str(call.name)
-        for call in report.calls
-        if isinstance(call.name, str)
-        and ("acco" in call.name.lower() or call.name in {"execute", "batch_execute", "recover"})
-    )
+    previous_state = os.environ.get("ACCO_STATE_DIR")
+    os.environ["ACCO_STATE_DIR"] = str(state_root)
+    try:
+        events = load_events(root)
+        event_kinds = Counter(
+            str(event.get("kind") or "unknown")
+            for event in events
+            if isinstance(event, dict)
+        )
+        report = analyze([transcript], keep_content=False)
+        tool_calls = Counter(
+            str(call.name)
+            for call in report.calls
+            if isinstance(call.name, str)
+            and (
+                "acco" in call.name.lower()
+                or call.name in {"execute", "batch_execute", "recover"}
+            )
+        )
 
-    recovery = {
-        "records": 0,
-        "byte_records": 0,
-        "object_records": 0,
-        "dependencies": 0,
-        "used_bytes": 0,
-    }
-    if recovery_path(root).is_file():
         recovery = {
-            key: value
-            for key, value in RecoveryStore(root).stats().items()
-            if key != "path"
+            "records": 0,
+            "byte_records": 0,
+            "object_records": 0,
+            "dependencies": 0,
+            "used_bytes": 0,
+        }
+        if recovery_path(root).is_file():
+            recovery = {
+                key: value
+                for key, value in RecoveryStore(root).stats().items()
+                if key != "path"
+            }
+
+        fields = field_learning_report(root)
+        cache = cache_ttl_report(root)
+        observability = observability_report(root, days=3650)
+
+        surface_activity = {
+            "recovery_v2": int(recovery.get("records", 0) or 0) > 0,
+            "tool_field_learning": bool(fields.get("fields")),
+            "cache_ttl_learning": bool(cache.get("estimates"))
+            or event_kinds.get("cache_ttl_observation", 0) > 0,
+            "output_holdout": (
+                event_kinds.get("output_holdout_assignment", 0) > 0
+                or event_kinds.get("output_holdout_observation", 0) > 0
+            ),
+            "provider_observability": bool(observability.get("providers"))
+            or bool(observability.get("frameworks")),
+            "out_of_context_execution": any(
+                name.endswith("execute")
+                or name.endswith("execute_file")
+                or name.endswith("batch_execute")
+                for name in tool_calls
+            ),
+            "task_contract": any("task_contract" in kind for kind in event_kinds),
+            "session_continuity": any(
+                token in kind
+                for kind in event_kinds
+                for token in ("session_", "continuity", "checkpoint", "guardian")
+            ),
         }
 
-    fields = field_learning_report(root)
-    cache = cache_ttl_report(root)
-    observability = observability_report(root, days=3650)
-
-    surface_activity = {
-        "recovery_v2": int(recovery.get("records", 0) or 0) > 0,
-        "tool_field_learning": bool(fields.get("fields")),
-        "cache_ttl_learning": bool(cache.get("estimates"))
-        or event_kinds.get("cache_ttl_observation", 0) > 0,
-        "output_holdout": (
-            event_kinds.get("output_holdout_assignment", 0) > 0
-            or event_kinds.get("output_holdout_observation", 0) > 0
-        ),
-        "provider_observability": bool(observability.get("providers"))
-        or bool(observability.get("frameworks")),
-        "out_of_context_execution": any(
-            name.endswith("execute")
-            or name.endswith("execute_file")
-            or name.endswith("batch_execute")
-            for name in tool_calls
-        ),
-        "task_contract": any("task_contract" in kind for kind in event_kinds),
-        "session_continuity": any(
-            token in kind
-            for kind in event_kinds
-            for token in ("session_", "continuity", "checkpoint", "guardian")
-        ),
-    }
-
-    return {
-        "schema": 1,
-        "event_kinds": dict(sorted(event_kinds.items())),
-        "acco_tool_calls": dict(sorted(tool_calls.items())),
-        "recovery": recovery,
-        "tool_fields": fields,
-        "cache_ttl": cache,
-        "observability": observability,
-        "surface_activity": surface_activity,
-        "any_activity": bool(events)
-        or bool(tool_calls)
-        or any(surface_activity.values()),
-        "claim_boundary": (
-            "Activation counters prove only that a mechanism was exercised. "
-            "Task success, quality, and cost effects remain properties of the paired "
-            "end-to-end benchmark."
-        ),
-    }
+        return {
+            "schema": 1,
+            "event_kinds": dict(sorted(event_kinds.items())),
+            "acco_tool_calls": dict(sorted(tool_calls.items())),
+            "recovery": recovery,
+            "tool_fields": fields,
+            "cache_ttl": cache,
+            "observability": observability,
+            "surface_activity": surface_activity,
+            "any_activity": bool(events)
+            or bool(tool_calls)
+            or any(surface_activity.values()),
+            "claim_boundary": (
+                "Activation counters prove only that a mechanism was exercised. "
+                "Task success, quality, and cost effects remain properties of the paired "
+                "end-to-end benchmark."
+            ),
+        }
+    finally:
+        if previous_state is None:
+            os.environ.pop("ACCO_STATE_DIR", None)
+        else:
+            os.environ["ACCO_STATE_DIR"] = previous_state
 
 
 def aggregate_runtime_activation(runs: list[dict[str, Any]]) -> dict[str, Any]:
