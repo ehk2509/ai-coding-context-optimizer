@@ -1,4 +1,4 @@
-# Validation for 1.23.0
+# Validation for 1.24.0
 
 ## Frozen paired SWE-bench subscription result (ACCO 1.22.1)
 
