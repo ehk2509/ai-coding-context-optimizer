@@ -65,9 +65,13 @@ and one task suite, not a universal savings figure; see the
 [frozen result](benchmarks/e2e-swebench-24-subscription.frozen.result.md).
 
 The 1.24 additions are release-gated engineering surfaces, not a new universal
-savings claim. The frozen 1.22.1 result remains the current publishable
-cost-per-success evidence until a fresh frozen experiment exercises the new
-runtime/cache/recovery/learning stack. See [Validation evidence](VALIDATION.md)
+savings claim. A fresh frozen run of ACCO 1.24.0 on 24 unseen SWE-bench tasks
+cut equivalent cost by 19.5% (task-cluster 95% CI 5.4–31.1%) and tokens by
+23.6%, but solved 52/72 vs 55/72, so the publication gate withholds its
+cost-per-success figure; see the
+[fresh 1.24 result](benchmarks/e2e-swebench-24-1.24-fresh.frozen.result.md).
+The frozen 1.22.1 result remains the current publishable cost-per-success
+evidence. See [Validation evidence](VALIDATION.md)
 and [Benchmarking methodology](BENCHMARKING.md).
 
 ## Install

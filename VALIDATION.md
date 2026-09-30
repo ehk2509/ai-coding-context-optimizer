@@ -1,5 +1,26 @@
 # Validation for 1.24.0
 
+## Fresh frozen SWE-bench result (ACCO 1.24.0): headline withheld
+
+Suite `benchmarks/e2e-swebench-24-1.24-fresh.frozen.json` (24 unseen SWE-bench
+Verified tasks, 6 repositories) was committed before the first paid run and run
+as 144 paired runs with the same host, model and grading as below. The protocol
+is valid, but ACCO 1.24.0 (`6c1689d`) solved 52/72 vs 55/72 for plain Claude
+Code, so `acco benchmark` withholds the cost-per-success figure.
+
+| | Plain Claude Code | ACCO `6c1689d` (1.24.0) |
+|---|---:|---:|
+| Solved | 55/72 | 52/72 |
+| Total cost (equivalent API) | $23.54 | $18.94 (−19.5%) |
+| Total tokens | 60.5M | 46.3M (−23.6%) |
+| Model calls | 1,444 | 1,173 (−18.8%) |
+
+Task-cluster 95% CIs: cost reduction 5.4% to 31.1%; token reduction 7.5% to
+36.3%; cost-per-success reduction −0.8% to 26.9%; success-rate change −9.7 to
++1.4 points. Runtime activation: Task Contract 72/72 ACCO runs, Recovery v2
+28/72, other 1.24 surfaces 0/72. Details:
+`benchmarks/e2e-swebench-24-1.24-fresh.frozen.result.md`.
+
 ## Frozen paired SWE-bench subscription result (ACCO 1.22.1)
 
 The first end-to-end cost result to pass the `acco benchmark` publication gate

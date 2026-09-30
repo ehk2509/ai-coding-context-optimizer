@@ -1,0 +1,506 @@
+{
+ "schema": 1,
+ "status": "fresh-frozen-evidence-gate-withheld",
+ "publication_gate": {
+  "protocol_valid": true,
+  "protocol_issues": [],
+  "claim_allowed": false,
+  "headline_cost_per_success_reduction_percent": null,
+  "withheld_because": "ACCO success rate (52/72) is below plain Claude Code (55/72); the gate requires treatment success >= baseline success"
+ },
+ "suite": {
+  "file": "benchmarks/e2e-swebench-24-1.24-fresh.frozen.json",
+  "candidate_builder": "scripts/build_e2e_124_fresh_candidate.py",
+  "task_definition_sha256": "7770010c40737b9bb3be13e4af422d87ab9aa5a8190f26444cd7bffb9faf5037",
+  "frozen_at": "2026-09-30T10:36:16.651180+00:00",
+  "freeze_commit": "b068fd2 (committed before the first paid run)",
+  "evidence_scope": "fresh-unseen-1.24-headline",
+  "condition_order_seed": 20260930,
+  "cohort_selection_seed": 20260930
+ },
+ "run_window": "2026-09-30T10:36 to 2026-09-30T20:44 UTC (paused twice for subscription usage limits)",
+ "design": {
+  "tasks": 24,
+  "trials_per_task": 3,
+  "total_runs": 144,
+  "repositories": 6
+ },
+ "agent": {
+  "host": "Claude Code 2.1.276",
+  "model": "claude-sonnet-5",
+  "auth": "Claude subscription",
+  "environment": "SWE-bench task image per task, snapshot at /testbed",
+  "acco_arm": "ACCO 1.24.0 (6c1689d), default acco setup --host claude, image acco-e2e-agent:2.1.276-acco-6c1689d; provider proxy and output holdout not enabled",
+  "baseline_arm": "plain Claude Code, ACCO_DISABLED=1"
+ },
+ "grading": "official SWE-bench image, hidden tests after the agent, agent test-file edits stripped",
+ "pricing": {
+  "file": "benchmarks/claude-sonnet-5-rates-2026-09-19.json",
+  "note": "equivalent API cost from transcript usage; not the subscription bill"
+ },
+ "not_covered": [
+  "blind output-quality grading was not run",
+  "single model, single host and a single 24-task SWE-bench suite",
+  "no ablation, so no 1.24 feature-specific causal claim"
+ ],
+ "totals": {
+  "claude_code": {
+   "run_count": 72,
+   "successes": 55,
+   "success_rate": 0.7638888888888888,
+   "input_tokens": 59967272,
+   "output_tokens": 539576,
+   "total_tokens": 60506848,
+   "cached_input_tokens": 58338221,
+   "tool_calls": 1371,
+   "model_calls": 1444,
+   "total_cost_usd": 23.5383482,
+   "cost_per_run_usd": 0.3269215027777778,
+   "cost_per_success_usd": 0.4279699672727273,
+   "mean_latency_ms": 117982.9259900014,
+   "median_latency_ms": 95254.53426875174
+  },
+  "acco": {
+   "run_count": 72,
+   "successes": 52,
+   "success_rate": 0.7222222222222222,
+   "input_tokens": 45803639,
+   "output_tokens": 447333,
+   "total_tokens": 46250972,
+   "cached_input_tokens": 44405159,
+   "tool_calls": 1102,
+   "model_calls": 1173,
+   "total_cost_usd": 18.9435898,
+   "cost_per_run_usd": 0.2631054138888889,
+   "cost_per_success_usd": 0.3642998038461539,
+   "mean_latency_ms": 107804.90983582826,
+   "median_latency_ms": 82834.83948651701
+  }
+ },
+ "delta": {
+  "input_token_reduction": 0.23618938343568474,
+  "output_token_reduction": 0.1709546013907216,
+  "total_token_reduction": 0.23560764560070957,
+  "cost_reduction": 0.1952030941576436,
+  "cost_per_success_reduction": 0.14877250343596904,
+  "latency_reduction": 0.08626685657071842,
+  "success_rate_change": -0.04166666666666663,
+  "tool_call_change": -269,
+  "model_call_change": -271
+ },
+ "confidence_95": {
+  "total_token_reduction": [
+   0.07485841425764073,
+   0.36307289906161566
+  ],
+  "cost_reduction": [
+   0.053607483081490104,
+   0.31076161361626253
+  ],
+  "success_rate_change": [
+   -0.09722222222222232,
+   0.01388888888888895
+  ],
+  "cost_per_success_reduction": [
+   -0.00793837195217928,
+   0.26945909761125786
+  ]
+ },
+ "confidence_method": "cluster bootstrap over tasks, 2000 resamples, seed 0, 95% percentile interval",
+ "outcomes": {
+  "both_success": 49,
+  "improved_tasks": [
+   "astropy__astropy-13236#3",
+   "matplotlib__matplotlib-23299#3",
+   "pytest-dev__pytest-7205#3"
+  ],
+  "regressed_tasks": [
+   "astropy__astropy-13977#1",
+   "astropy__astropy-14182#3",
+   "matplotlib__matplotlib-23299#2",
+   "matplotlib__matplotlib-24570#2",
+   "pytest-dev__pytest-5840#1",
+   "pytest-dev__pytest-7205#1"
+  ]
+ },
+ "runtime_activation": {
+  "schema": 1,
+  "enabled_runs": 72,
+  "runs_with_activation_evidence": 72,
+  "runs_with_collection_errors": 0,
+  "runs_with_any_activity": 72,
+  "coverage_complete": true,
+  "event_kinds": {
+   "saving": 59,
+   "waste": 13
+  },
+  "acco_tool_calls": {},
+  "surface_runs": {
+   "recovery_v2": 28,
+   "task_contract": 72
+  },
+  "claim_boundary": "This report measures feature activation only. A surface with zero activation is not covered by the experiment, and an activated surface does not by itself establish benefit."
+ },
+ "tasks": [
+  {
+   "task": "astropy__astropy-12907",
+   "claude_code": {
+    "solved": 3,
+    "usd": 0.4294,
+    "model_calls": 23
+   },
+   "acco": {
+    "solved": 3,
+    "usd": 0.3794,
+    "model_calls": 27
+   },
+   "cost_change": -0.1166,
+   "recovery_v2_runs": 0
+  },
+  {
+   "task": "astropy__astropy-13236",
+   "claude_code": {
+    "solved": 2,
+    "usd": 1.582,
+    "model_calls": 112
+   },
+   "acco": {
+    "solved": 3,
+    "usd": 1.2758,
+    "model_calls": 87
+   },
+   "cost_change": -0.1936,
+   "recovery_v2_runs": 3
+  },
+  {
+   "task": "astropy__astropy-13453",
+   "claude_code": {
+    "solved": 3,
+    "usd": 0.8622,
+    "model_calls": 57
+   },
+   "acco": {
+    "solved": 3,
+    "usd": 0.6353,
+    "model_calls": 47
+   },
+   "cost_change": -0.2632,
+   "recovery_v2_runs": 2
+  },
+  {
+   "task": "astropy__astropy-13977",
+   "claude_code": {
+    "solved": 1,
+    "usd": 1.6195,
+    "model_calls": 84
+   },
+   "acco": {
+    "solved": 0,
+    "usd": 1.3945,
+    "model_calls": 67
+   },
+   "cost_change": -0.1389,
+   "recovery_v2_runs": 0
+  },
+  {
+   "task": "astropy__astropy-14182",
+   "claude_code": {
+    "solved": 3,
+    "usd": 1.2391,
+    "model_calls": 65
+   },
+   "acco": {
+    "solved": 2,
+    "usd": 0.8086,
+    "model_calls": 42
+   },
+   "cost_change": -0.3475,
+   "recovery_v2_runs": 1
+  },
+  {
+   "task": "matplotlib__matplotlib-22865",
+   "claude_code": {
+    "solved": 3,
+    "usd": 1.133,
+    "model_calls": 72
+   },
+   "acco": {
+    "solved": 3,
+    "usd": 0.4994,
+    "model_calls": 33
+   },
+   "cost_change": -0.5592,
+   "recovery_v2_runs": 2
+  },
+  {
+   "task": "matplotlib__matplotlib-23299",
+   "claude_code": {
+    "solved": 1,
+    "usd": 1.3571,
+    "model_calls": 74
+   },
+   "acco": {
+    "solved": 1,
+    "usd": 1.9001,
+    "model_calls": 90
+   },
+   "cost_change": 0.4001,
+   "recovery_v2_runs": 3
+  },
+  {
+   "task": "matplotlib__matplotlib-23476",
+   "claude_code": {
+    "solved": 0,
+    "usd": 1.3676,
+    "model_calls": 83
+   },
+   "acco": {
+    "solved": 0,
+    "usd": 1.1316,
+    "model_calls": 73
+   },
+   "cost_change": -0.1726,
+   "recovery_v2_runs": 1
+  },
+  {
+   "task": "matplotlib__matplotlib-24570",
+   "claude_code": {
+    "solved": 3,
+    "usd": 0.498,
+    "model_calls": 32
+   },
+   "acco": {
+    "solved": 2,
+    "usd": 0.4521,
+    "model_calls": 29
+   },
+   "cost_change": -0.0922,
+   "recovery_v2_runs": 1
+  },
+  {
+   "task": "matplotlib__matplotlib-24970",
+   "claude_code": {
+    "solved": 3,
+    "usd": 0.71,
+    "model_calls": 42
+   },
+   "acco": {
+    "solved": 3,
+    "usd": 0.6725,
+    "model_calls": 38
+   },
+   "cost_change": -0.0528,
+   "recovery_v2_runs": 1
+  },
+  {
+   "task": "pydata__xarray-3305",
+   "claude_code": {
+    "solved": 3,
+    "usd": 0.7923,
+    "model_calls": 51
+   },
+   "acco": {
+    "solved": 3,
+    "usd": 0.8053,
+    "model_calls": 54
+   },
+   "cost_change": 0.0163,
+   "recovery_v2_runs": 2
+  },
+  {
+   "task": "pydata__xarray-4075",
+   "claude_code": {
+    "solved": 3,
+    "usd": 0.3581,
+    "model_calls": 24
+   },
+   "acco": {
+    "solved": 3,
+    "usd": 0.3334,
+    "model_calls": 22
+   },
+   "cost_change": -0.069,
+   "recovery_v2_runs": 0
+  },
+  {
+   "task": "pydata__xarray-4687",
+   "claude_code": {
+    "solved": 3,
+    "usd": 2.2862,
+    "model_calls": 121
+   },
+   "acco": {
+    "solved": 3,
+    "usd": 1.1376,
+    "model_calls": 74
+   },
+   "cost_change": -0.5024,
+   "recovery_v2_runs": 3
+  },
+  {
+   "task": "pydata__xarray-6938",
+   "claude_code": {
+    "solved": 0,
+    "usd": 1.1827,
+    "model_calls": 82
+   },
+   "acco": {
+    "solved": 0,
+    "usd": 1.2618,
+    "model_calls": 84
+   },
+   "cost_change": 0.0669,
+   "recovery_v2_runs": 3
+  },
+  {
+   "task": "pylint-dev__pylint-4604",
+   "claude_code": {
+    "solved": 0,
+    "usd": 0.8871,
+    "model_calls": 75
+   },
+   "acco": {
+    "solved": 0,
+    "usd": 0.6493,
+    "model_calls": 52
+   },
+   "cost_change": -0.2681,
+   "recovery_v2_runs": 0
+  },
+  {
+   "task": "pylint-dev__pylint-6903",
+   "claude_code": {
+    "solved": 3,
+    "usd": 0.4834,
+    "model_calls": 37
+   },
+   "acco": {
+    "solved": 3,
+    "usd": 0.5888,
+    "model_calls": 45
+   },
+   "cost_change": 0.2181,
+   "recovery_v2_runs": 1
+  },
+  {
+   "task": "pytest-dev__pytest-10051",
+   "claude_code": {
+    "solved": 3,
+    "usd": 0.556,
+    "model_calls": 40
+   },
+   "acco": {
+    "solved": 3,
+    "usd": 0.4149,
+    "model_calls": 30
+   },
+   "cost_change": -0.2538,
+   "recovery_v2_runs": 0
+  },
+  {
+   "task": "pytest-dev__pytest-10081",
+   "claude_code": {
+    "solved": 3,
+    "usd": 1.0618,
+    "model_calls": 73
+   },
+   "acco": {
+    "solved": 3,
+    "usd": 0.693,
+    "model_calls": 46
+   },
+   "cost_change": -0.3473,
+   "recovery_v2_runs": 2
+  },
+  {
+   "task": "pytest-dev__pytest-5840",
+   "claude_code": {
+    "solved": 1,
+    "usd": 2.5401,
+    "model_calls": 132
+   },
+   "acco": {
+    "solved": 0,
+    "usd": 1.2177,
+    "model_calls": 60
+   },
+   "cost_change": -0.5206,
+   "recovery_v2_runs": 1
+  },
+  {
+   "task": "pytest-dev__pytest-7205",
+   "claude_code": {
+    "solved": 2,
+    "usd": 0.8307,
+    "model_calls": 56
+   },
+   "acco": {
+    "solved": 2,
+    "usd": 0.9043,
+    "model_calls": 64
+   },
+   "cost_change": 0.0887,
+   "recovery_v2_runs": 2
+  },
+  {
+   "task": "scikit-learn__scikit-learn-12973",
+   "claude_code": {
+    "solved": 3,
+    "usd": 0.2863,
+    "model_calls": 20
+   },
+   "acco": {
+    "solved": 3,
+    "usd": 0.3331,
+    "model_calls": 22
+   },
+   "cost_change": 0.1638,
+   "recovery_v2_runs": 0
+  },
+  {
+   "task": "scikit-learn__scikit-learn-13142",
+   "claude_code": {
+    "solved": 3,
+    "usd": 0.2907,
+    "model_calls": 18
+   },
+   "acco": {
+    "solved": 3,
+    "usd": 0.2839,
+    "model_calls": 18
+   },
+   "cost_change": -0.0232,
+   "recovery_v2_runs": 0
+  },
+  {
+   "task": "scikit-learn__scikit-learn-14087",
+   "claude_code": {
+    "solved": 3,
+    "usd": 0.8586,
+    "model_calls": 49
+   },
+   "acco": {
+    "solved": 3,
+    "usd": 0.8096,
+    "model_calls": 46
+   },
+   "cost_change": -0.057,
+   "recovery_v2_runs": 0
+  },
+  {
+   "task": "scikit-learn__scikit-learn-25931",
+   "claude_code": {
+    "solved": 3,
+    "usd": 0.3265,
+    "model_calls": 22
+   },
+   "acco": {
+    "solved": 3,
+    "usd": 0.3618,
+    "model_calls": 23
+   },
+   "cost_change": 0.1079,
+   "recovery_v2_runs": 0
+  }
+ ]
+}
