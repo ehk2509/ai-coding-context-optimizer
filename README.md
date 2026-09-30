@@ -1,33 +1,60 @@
-# ACCO — AI Coding Context Optimizer 1.23.0
+# ACCO — AI Coding Context Optimizer 1.24.0
 
 **ACCO (AI Coding Context Optimizer)** is a local context-optimization layer for AI coding agents. It reduces unnecessary source, tool-output, and always-on context while preserving exact code where the model needs it.
 
 The project is deliberately conservative: **smaller context is useful only when the task still succeeds**. ACCO does not claim a universal percentage reduction in task cost. It measures input size, preserves diagnostics, and keeps omitted command output recoverable.
 
-## What's new in 1.23.0
+## What's new in 1.24.0
 
-ACCO 1.23 closes two major context-efficiency gaps while keeping its
-retrieval-first design:
+ACCO 1.24 deepens the runtime around the retrieval-first core without replacing it:
 
-- **Out-of-context programmable execution.** Agents can run bounded local
-  analysis over explicit repository text files and return only a small JSON
-  result instead of loading large logs, JSON, reports, or fixtures into model
-  context. The same implementation is available through MCP, Python, the
-  loopback SDK bridge, TypeScript, and standalone binaries. Oversized computed
-  results remain exactly recoverable through `tsr_...` handles.
-- **Native coding-host interception.** The shared `HookRuntime` now powers
-  native project hooks for Codex, Cursor, Gemini CLI, Qwen Code, and Copilot
-  CLI in addition to Claude Code. ACCO advertises only what each host can
-  actually enforce; Codex interception remains conditional on the host's
-  project-hook trust boundary.
-- **Stronger completion discipline.** A prompt-derived task checklist protects
-  focused verification from stopping after only the first API/path named in a
-  multi-path issue.
-- **Broader end-to-end evidence.** A 144-run paired SWE-bench development study
-  measured fewer model calls/tokens and lower equivalent cost per solved task,
-  but ACCO withholds a general savings claim because the suite was adapted
-  rather than frozen and ACCO solved 55/72 runs versus 56/72 for plain Claude
-  Code.
+- **Reusable and batched out-of-context compute.** `execute_file` runs reusable
+  repository-contained restricted programs and `batch_execute` runs up to
+  eight preflighted jobs under aggregate input/time/result bounds. Oversized
+  aggregate JSON remains exactly recoverable.
+- **Searchable session history + Task Contract reconstruction.** A private
+  per-project SQLite/FTS ledger records bounded redacted work events while the
+  Task Contract reconstructs goals, decisions, working files, failures,
+  validation state and named checks without copying raw prompt/tool-output
+  transcripts into continuity state.
+- **Recovery Store v2.** Existing `tsr_...` byte handles now coexist with typed
+  `tsr_obj_...` canonical JSON records, dependency edges, full digest checks,
+  in-place legacy migration and RFC 6901 subtree recovery.
+- **Formal compression safety contracts.** Content classification, S0-S4 safety
+  classes and JSON/diff/table/source invariant gates now sit above the existing
+  command-specific processors. Selective/lossy SDK output requires exact
+  recovery.
+- **Warm native hook runtime.** Real CLI hook traffic can reuse an authenticated
+  project-local loopback `HookRuntime` instead of rebuilding the runtime on
+  every event; startup/transport failure keeps the existing direct path.
+- **Provider cache economics with conversation epochs.** Prefix reuse is tracked
+  independently across interleaved agents/subagents, planned economics are kept
+  separate from provider-observed cache counters, and safe Anthropic/Bedrock
+  breakpoints can be applied opt-in.
+- **Learned tool-field importance.** Structured JSON tool results learn only
+  bounded tool identities, structural field paths and exposure/retrieval counts.
+  Qualified fields become recoverable packing hints; field values are not stored
+  in the learner.
+- **Provider-observed cache-TTL learning.** TTL bounds are inferred only from
+  explicit cache counters and exact-prefix evidence. Missing counters are never
+  treated as misses.
+- **Measured output-shaping holdouts.** Conversation-stable control/treatment
+  assignment measures provider-reported output-token deltas for eligible
+  traffic without converting that measurement into a quality or
+  cost-per-success claim.
+- **Provider/framework observability.** Content-free latency/token/runtime
+  metrics are available through CLI, Python, TypeScript, local JSON stats and a
+  Prometheus endpoint.
+
+Inspect the new learning and observability surfaces with:
+
+```bash
+acco tool-fields .
+acco cache-ttl .
+acco output-holdout .
+acco observability .
+acco observability . --prometheus
+```
 
 **Frozen end-to-end result (ACCO 1.22.1, Claude Code + Sonnet 5):** on a frozen
 24-task SWE-bench Verified suite (3 paired trials per task, 144 runs, hidden-test
@@ -37,87 +64,11 @@ with 26% fewer tokens and 16.5% fewer model calls. This is one model, one host
 and one task suite, not a universal savings figure; see the
 [frozen result](benchmarks/e2e-swebench-24-subscription.frozen.result.md).
 
-ACCO makes no universal token, API-cost, or cost-per-success claim beyond that
-scoped result; see [Validation evidence](VALIDATION.md) and
-[Benchmarking methodology](BENCHMARKING.md).
-
-## Current main: deeper execution + searchable session history
-
-The next development line extends two 1.23 capabilities without weakening their
-boundaries:
-
-- **Reusable and batched out-of-context compute.** MCP/SDK clients can now use
-  `execute`, `execute_file`, or `batch_execute`. Reusable restricted Python
-  programs can live in the repository, and a batch can run up to eight bounded
-  jobs under one aggregate input/time/result envelope. Large aggregate results
-  remain exactly recoverable rather than being silently truncated.
-- **Event-backed session ledger.** ACCO now records redacted structured working
-  events—session starts, explicit user decisions/preferences, file activity,
-  commands, failures, validations, and compaction checkpoints—in a private
-  per-project SQLite ledger. FTS5 search is used when available with a bounded
-  LIKE fallback. Resume context can draw on recent ledger state, while MCP/SDK
-  callers can query older history through `session_search` / `session_recent`.
-  Raw prompts and raw tool outputs are not stored in this ledger.
-
-This remains separate from durable project knowledge: the ledger records what
-happened during work, while finding/memory stores represent conclusions the
-agent explicitly chose to preserve.
-
-The current development branch also deepens five runtime foundations:
-
-- **Recovery Store v2:** exact byte handles now coexist with typed
-  `tsr_obj_...` objects and JSON-Pointer subtree recovery. Existing v1 recovery
-  databases migrate in place; digests are checked on retrieval and capacity
-  still fails closed without evicting live handles.
-- **Formal compression safety contracts:** payloads are classified independently
-  of their command, assigned an S0-S4 safety class, and format invariants are
-  checked before a smaller representation is accepted. Selective/lossy output
-  requires exact recovery.
-- **Warm native hook runtime:** real CLI hook traffic can reuse a private
-  authenticated project-local loopback runtime instead of rebuilding
-  HookRuntime on every event. Startup and transport failure fall back to the
-  existing direct path; timeouts fail open without replaying side effects.
-- **Provider cache economics:** prefix tracking is now conversation-epoch aware
-  so interleaved agents/subagents do not share one false cache anchor. ACCO
-  separates planned cache economics from provider-observed cache counters and
-  can opt into safe Anthropic-style cache breakpoints.
-- **Task Contract reconstruction:** resume state combines current task goal,
-  explicit decisions, working files, unresolved failures, validation state and
-  named checks with relevance-ranked older ledger evidence. A passing validator
-  resolves only failures from the same validation family.
-
-These mechanisms are new engineering surfaces, not new savings claims. The
-frozen 1.22.1 end-to-end result above remains the current publishable
-cost-per-success evidence until a fresh frozen experiment exercises them.
-
-The development branch also adds four evidence-driven runtime learning loops:
-
-- **Learned tool-field importance:** structured JSON tool results record only
-  tool identity, structural field paths, exposure counts, and selective-recovery
-  counts. Fields become packing hints only after repeated local evidence; field
-  values are never stored in the learner.
-- **Provider-observed cache-TTL learning:** cache lifetime bounds are inferred
-  only when the provider explicitly reports cache counters. Missing counters are
-  never treated as misses. Qualified TTLs require repeated observed hits plus an
-  exact-prefix post-hit miss.
-- **Measured output-shaping holdouts:** an opt-in conversation-stable control arm
-  measures provider-reported output tokens against ACCO's existing calibrated
-  output budgets. Only eligible traffic enters the comparison, and the report
-  explicitly does not claim quality or cost-per-success parity.
-- **Provider/framework observability:** the provider proxy exposes local
-  `/__acco/stats` and Prometheus `/__acco/metrics`; Python and TypeScript SDKs
-  expose the same content-free operational reports. Request/response bodies are
-  not copied into observability events.
-
-Inspect them with:
-
-```bash
-acco tool-fields .
-acco cache-ttl .
-acco output-holdout .
-acco observability .
-acco observability . --prometheus
-```
+The 1.24 additions are release-gated engineering surfaces, not a new universal
+savings claim. The frozen 1.22.1 result remains the current publishable
+cost-per-success evidence until a fresh frozen experiment exercises the new
+runtime/cache/recovery/learning stack. See [Validation evidence](VALIDATION.md)
+and [Benchmarking methodology](BENCHMARKING.md).
 
 ## Install
 

@@ -1,3 +1,3 @@
 """ACCO — AI Coding Context Optimizer for efficient, evidence-complete coding context."""
 
-__version__ = "1.23.0"
+__version__ = "1.24.0"
