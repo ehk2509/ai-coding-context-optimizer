@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 
 from acco.experiment import build_schedule, validate_suite
@@ -20,6 +21,45 @@ META_KEYS = (
     "quality_grader",
     "evidence",
 )
+
+# Verification entries that point at run artifacts.
+VERIFICATION_PATH_KEYS = ("graded_patch", "stdout", "stderr")
+
+
+def _rebase(value: str, source: Path, target: Path) -> str:
+    """Re-express a path relative to ``source`` as relative to ``target``."""
+    if Path(value).is_absolute():
+        return value
+    return os.path.relpath(source / value, target)
+
+
+def _rebase_run(run: dict, source: Path, target: Path) -> dict:
+    """Keep a run's artifact paths valid once written next to ``target``.
+
+    Shards store artifact paths relative to the shard file, and ``acco
+    benchmark`` resolves them relative to the merged manifest.
+    """
+    run = dict(run)
+    transcripts = run.get("transcripts")
+    if isinstance(transcripts, list):
+        run["transcripts"] = [
+            _rebase(p, source, target) if isinstance(p, str) else p
+            for p in transcripts
+        ]
+    if isinstance(run.get("agent_patch"), str):
+        run["agent_patch"] = _rebase(run["agent_patch"], source, target)
+    verification = run.get("verification")
+    if isinstance(verification, list):
+        rebased = []
+        for item in verification:
+            if isinstance(item, dict):
+                item = dict(item)
+                for key in VERIFICATION_PATH_KEYS:
+                    if isinstance(item.get(key), str):
+                        item[key] = _rebase(item[key], source, target)
+            rebased.append(item)
+        run["verification"] = rebased
+    return run
 
 
 def main() -> int:
@@ -56,7 +96,7 @@ def main() -> int:
             if key in seen:
                 raise SystemExit(f"duplicate run across shards: {key}")
             seen.add(key)
-            merged["runs"].append(run)
+            merged["runs"].append(_rebase_run(run, path.parent, output.parent))
 
     expected = {
         (str(item["task"]), str(item["trial"]), str(item["condition"]))
