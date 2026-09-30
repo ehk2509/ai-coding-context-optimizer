@@ -164,6 +164,33 @@ relevance-ranked older ledger events. Passing validation only resolves matching
 validation-family failures; no remembered result supersedes live source or
 tests.
 
+## Learned runtime evidence loops
+
+Four optional learning/measurement layers sit beside, not inside, ACCO's
+correctness-critical transforms:
+
+- `tool_field_learning.py` stores only bounded tool identities, structural JSON
+  paths, exposure counts, and selective-recovery counts. Qualified hints may
+  preserve repeatedly requested fields during recoverable JSON compaction.
+  Exact recovery remains authoritative; learning failure is fail-open.
+- `cache_ttl.py` consumes provider-observed cache counters plus stable-prefix
+  reuse state. Missing cache counters produce no TTL evidence. A qualified TTL
+  requires repeated observed hits and an exact-prefix post-hit miss, yielding
+  conservative hit/miss bounds rather than a guessed provider constant.
+- `output_holdout.py` assigns eligible conversations deterministically to
+  control/treatment using opaque conversation hashes. Treatment only clamps an
+  already-present provider output limit. Reports aggregate conversation-level
+  means by provider/model/task/mode/limit-field and bootstrap the measured
+  output-token delta. This is not a response-quality or cost-per-success gate.
+- `observability.py` aggregates content-free provider and framework operation
+  metadata. The provider proxy exposes local JSON and Prometheus surfaces, while
+  Python/TypeScript SDKs expose the same report data.
+
+These layers can influence optimization only where an explicit safe integration
+exists: learned field hints affect recoverable JSON selection, and qualified TTL
+estimates are attached to provider cache planning. Measurement never substitutes
+for repository evidence, exact recovery, or frozen task-success evaluation.
+
 ## Command boundary
 
 `acco.entry` no longer owns a branch for every top-level command. New

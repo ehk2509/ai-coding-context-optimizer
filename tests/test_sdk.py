@@ -497,3 +497,37 @@ def test_sdk_provider_optimization_can_apply_context_budget(tmp_path, monkeypatc
 
     assert result["metadata"]["context_budget"]["total_tokens"] == 2000
     assert result["metadata"]["changed"] is True
+
+
+def test_sdk_application_exposes_learned_runtime_reports(tmp_path, monkeypatch):
+    """The loopback bridge should expose the same report surfaces as Python."""
+    engine = _engine(tmp_path, monkeypatch)
+    app = SdkApplication(engine)
+
+    status, observability = app.dispatch(
+        "POST",
+        "/v1/observability",
+        {"days": 3},
+    )
+    assert status == 200
+    assert observability["window_days"] == 3
+
+    status, ttl = app.dispatch("POST", "/v1/cache-ttl", {})
+    assert status == 200
+    assert ttl["estimates"] == []
+
+    status, holdout = app.dispatch(
+        "POST",
+        "/v1/output-holdout",
+        {"bootstrap_samples": 20},
+    )
+    assert status == 200
+    assert holdout["measured_output_token_reduction"] is None
+
+    status, fields = app.dispatch(
+        "POST",
+        "/v1/tool-fields",
+        {"limit": 10},
+    )
+    assert status == 200
+    assert fields["fields"] == []

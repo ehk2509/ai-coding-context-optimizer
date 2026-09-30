@@ -6,7 +6,9 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .cache_ttl import record_cache_observation
 from .efficiency.store import append_event
+from .output_holdout import record_output_holdout_observation
 from .provider_cache import observed_cache_evidence
 
 _MAX_JSON_OBSERVE_BYTES = 2 * 1024 * 1024
@@ -106,6 +108,9 @@ class ProviderUsageObserver:
         request_shape: str,
         streaming: bool,
         content_type: str = "",
+        cache_context: dict[str, Any] | None = None,
+        request_model: str | None = None,
+        output_holdout: dict[str, Any] | None = None,
     ):
         """Create one bounded response observer."""
         self.root = root.resolve()
@@ -113,6 +118,9 @@ class ProviderUsageObserver:
         self.request_shape = request_shape
         self.streaming = streaming
         self.content_type = content_type.lower()
+        self.cache_context = dict(cache_context or {})
+        self.request_model = request_model[:160] if isinstance(request_model, str) else None
+        self.output_holdout = dict(output_holdout or {})
         self._json = bytearray()
         self._line = bytearray()
         self._usage: dict[str, Any] = {}
@@ -185,4 +193,44 @@ class ProviderUsageObserver:
             "cache_evidence_basis": cache_evidence["evidence_basis"],
         }
         append_event(self.root, event)
+        prefix = self.cache_context
+        epoch = prefix.get("epoch_key")
+        reuse_mode = prefix.get("reuse_mode")
+        model = self._usage.get("model") or self.request_model
+        cache_counter_available = (
+            "cache_read_input_tokens" in self._usage
+            or "cache_creation_input_tokens" in self._usage
+        )
+        if (
+            cache_counter_available
+            and isinstance(epoch, str)
+            and isinstance(reuse_mode, str)
+            and isinstance(model, str)
+        ):
+            try:
+                record_cache_observation(
+                    self.root,
+                    provider=self.provider,
+                    model=model,
+                    epoch_key=epoch,
+                    reuse_mode=reuse_mode,
+                    cache_read_tokens=int(self._usage.get("cache_read_input_tokens", 0) or 0),
+                    cache_creation_tokens=int(
+                        self._usage.get("cache_creation_input_tokens", 0) or 0
+                    ),
+                )
+            except (OSError, ValueError):
+                pass
+        output_tokens = self._usage.get("output_tokens")
+        if isinstance(output_tokens, int) and isinstance(model, str):
+            try:
+                record_output_holdout_observation(
+                    self.root,
+                    provider=self.provider,
+                    model=model,
+                    output_tokens=output_tokens,
+                    decision=self.output_holdout,
+                )
+            except (OSError, ValueError):
+                pass
         return event

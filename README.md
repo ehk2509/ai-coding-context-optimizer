@@ -90,6 +90,35 @@ These mechanisms are new engineering surfaces, not new savings claims. The
 frozen 1.22.1 end-to-end result above remains the current publishable
 cost-per-success evidence until a fresh frozen experiment exercises them.
 
+The development branch also adds four evidence-driven runtime learning loops:
+
+- **Learned tool-field importance:** structured JSON tool results record only
+  tool identity, structural field paths, exposure counts, and selective-recovery
+  counts. Fields become packing hints only after repeated local evidence; field
+  values are never stored in the learner.
+- **Provider-observed cache-TTL learning:** cache lifetime bounds are inferred
+  only when the provider explicitly reports cache counters. Missing counters are
+  never treated as misses. Qualified TTLs require repeated observed hits plus an
+  exact-prefix post-hit miss.
+- **Measured output-shaping holdouts:** an opt-in conversation-stable control arm
+  measures provider-reported output tokens against ACCO's existing calibrated
+  output budgets. Only eligible traffic enters the comparison, and the report
+  explicitly does not claim quality or cost-per-success parity.
+- **Provider/framework observability:** the provider proxy exposes local
+  `/__acco/stats` and Prometheus `/__acco/metrics`; Python and TypeScript SDKs
+  expose the same content-free operational reports. Request/response bodies are
+  not copied into observability events.
+
+Inspect them with:
+
+```bash
+acco tool-fields .
+acco cache-ttl .
+acco output-holdout .
+acco observability .
+acco observability . --prometheus
+```
+
 ## Install
 
 ### Fast path

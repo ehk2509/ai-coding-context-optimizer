@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 from dataclasses import dataclass
 from pathlib import Path
+import time
 from typing import Any
 
 from .browser_context import compress_browser_payload
@@ -18,10 +19,18 @@ from .domain_middleware import (
 from .estimate import estimate_tokens
 from .efficiency.ledger import recent_ledger_events, search_ledger
 from .execution import ExecutionLimits, batch_execute, execute_file, execute_program
+from .cache_ttl import cache_ttl_report
 from .model_routing import route_task
+from .observability import (
+    observability_report,
+    prometheus_metrics,
+    record_framework_operation,
+)
+from .output_holdout import output_holdout_report
 from .output import OutputPolicy, OutputPipeline
 from .provider_transform import transform_provider_request
 from .recovery import DEFAULT_CAPACITY_BYTES, RecoveryCapacityError, RecoveryStore
+from .tool_field_learning import field_learning_report, record_field_retrieval
 
 
 @dataclass(frozen=True)
@@ -66,6 +75,34 @@ class AccoEngine:
         )
         self.output_pipeline = OutputPipeline()
 
+    def _observe_framework(
+        self,
+        framework: str,
+        operation: str,
+        result: dict[str, Any],
+        started: float,
+    ) -> None:
+        """Record content-free SDK/framework operation metrics."""
+        before = result.get("original_tokens")
+        after = result.get("output_tokens")
+        if not isinstance(before, int) or isinstance(before, bool):
+            return
+        if not isinstance(after, int) or isinstance(after, bool):
+            return
+        try:
+            record_framework_operation(
+                self.root,
+                framework=framework,
+                operation=operation,
+                original_tokens=before,
+                output_tokens=after,
+                latency_ms=(time.perf_counter() - started) * 1000.0,
+                changed=bool(result.get("changed")),
+                success=True,
+            )
+        except OSError:
+            pass
+
     def optimize_provider_request(
         self,
         provider: str,
@@ -79,10 +116,16 @@ class AccoEngine:
         context_budget_total_tokens: int | None = None,
         provider_cache_mode: str = "plan",
         provider_cache_expected_reuses: int = 2,
+        output_holdout_enabled: bool = False,
+        output_holdout_control_rate: float = 0.10,
+        output_holdout_mode: str = "normal",
+        output_holdout_calibration_file: str = ".acco.output-calibration.json",
+        framework: str = "sdk",
     ) -> dict[str, Any]:
         """Optimize one provider request while keeping exact recovery available."""
         if not isinstance(provider, str) or not provider.strip():
             raise ValueError("provider must be a nonempty string")
+        started = time.perf_counter()
         result = transform_provider_request(
             self.root,
             provider.strip(),
@@ -96,12 +139,21 @@ class AccoEngine:
             context_budget_total_tokens=context_budget_total_tokens,
             provider_cache_mode=provider_cache_mode,
             provider_cache_expected_reuses=provider_cache_expected_reuses,
+            output_holdout_enabled=output_holdout_enabled,
+            output_holdout_control_rate=output_holdout_control_rate,
+            output_holdout_mode=output_holdout_mode,
+            output_holdout_calibration_file=output_holdout_calibration_file,
         )
-        return {
+        payload = {
             "schema": 1,
             "body": result.body,
             "metadata": result.metadata(),
+            "original_tokens": result.original_tokens,
+            "output_tokens": result.output_tokens,
+            "changed": result.changed,
         }
+        self._observe_framework(framework, "provider.optimize", payload, started)
+        return payload
 
     def optimize_context(
         self,
@@ -111,10 +163,13 @@ class AccoEngine:
         command: str = "",
         max_lines: int = 120,
         min_reduction: float = 0.08,
+        tool_key: str = "sdk-context",
+        framework: str = "sdk",
     ) -> dict[str, Any]:
         """Compress arbitrary agent/tool context with exact-source recovery."""
         if not isinstance(text, str):
             raise ValueError("text must be a string")
+        started = time.perf_counter()
         result = route_context(
             text,
             query=query,
@@ -122,8 +177,11 @@ class AccoEngine:
             command=command,
             max_lines=max_lines,
             min_reduction=min_reduction,
+            tool_key=tool_key,
         )
-        return {"schema": 1, **result.to_dict()}
+        payload = {"schema": 1, **result.to_dict()}
+        self._observe_framework(framework, "context.optimize", payload, started)
+        return payload
 
     def optimize_browser_context(
         self,
@@ -133,10 +191,12 @@ class AccoEngine:
         max_lines: int = 120,
         min_tokens: int = 400,
         format_hint: str = "auto",
+        framework: str = "sdk",
     ) -> dict[str, Any]:
         """Optimize caller-supplied browser/DOM/AX context with exact recovery."""
         if not isinstance(text, str):
             raise ValueError("text must be a string")
+        started = time.perf_counter()
         result = compress_browser_payload(
             text,
             query=query,
@@ -145,7 +205,9 @@ class AccoEngine:
             format_hint=format_hint,
             recovery=self.recovery,
         )
-        return {"schema": 1, **result.to_dict()}
+        payload = {"schema": 1, **result.to_dict()}
+        self._observe_framework(framework, "browser.optimize", payload, started)
+        return payload
 
     def optimize_output(
         self,
@@ -157,6 +219,7 @@ class AccoEngine:
         keep_tail: int = 20,
         min_reduction: float = 0.02,
         recoverable: bool = True,
+        framework: str = "sdk",
     ) -> dict[str, Any]:
         """Optimize command output and optionally persist the exact original."""
         if not isinstance(text, str):
@@ -167,6 +230,7 @@ class AccoEngine:
             raise ValueError("keep_tail must be nonnegative")
         if not 0 <= min_reduction < 1:
             raise ValueError("min_reduction must be in [0, 1)")
+        started = time.perf_counter()
         result = self.output_pipeline.process(
             text,
             command,
@@ -199,7 +263,7 @@ class AccoEngine:
                 recovery_handle = None
         changed = candidate != text
         output_tokens = estimate_tokens(candidate)
-        return {
+        payload = {
             "schema": 1,
             "text": candidate,
             "processor": result.processor,
@@ -215,6 +279,8 @@ class AccoEngine:
             "output_tokens": output_tokens if changed else original_tokens,
             "recovery_handle": recovery_handle,
         }
+        self._observe_framework(framework, "output.optimize", payload, started)
+        return payload
 
     def plan_context_budget(
         self,
@@ -267,15 +333,19 @@ class AccoEngine:
         query: str = "",
         max_documents: int = 8,
         min_reduction: float = 0.08,
+        framework: str = "sdk",
     ) -> dict[str, Any]:
         """Compress caller-supplied RAG documents for model context."""
-        return optimize_rag_context(
+        started = time.perf_counter()
+        result = optimize_rag_context(
             documents,
             query=query,
             recovery=self.recovery,
             max_documents=max_documents,
             min_reduction=min_reduction,
         )
+        self._observe_framework(framework, "middleware.rag", result, started)
+        return result
 
     def optimize_api_payload(
         self,
@@ -283,14 +353,18 @@ class AccoEngine:
         *,
         query: str = "",
         min_reduction: float = 0.08,
+        framework: str = "sdk",
     ) -> dict[str, Any]:
         """Compress caller-supplied JSON API data for model context."""
-        return optimize_api_payload(
+        started = time.perf_counter()
+        result = optimize_api_payload(
             payload,
             query=query,
             recovery=self.recovery,
             min_reduction=min_reduction,
         )
+        self._observe_framework(framework, "middleware.api", result, started)
+        return result
 
     def optimize_database_rows(
         self,
@@ -300,9 +374,11 @@ class AccoEngine:
         columns: list[str] | None = None,
         max_rows: int = 20,
         min_reduction: float = 0.08,
+        framework: str = "sdk",
     ) -> dict[str, Any]:
         """Compress caller-supplied query results without opening a database."""
-        return optimize_database_rows(
+        started = time.perf_counter()
+        result = optimize_database_rows(
             rows,
             query=query,
             recovery=self.recovery,
@@ -310,6 +386,8 @@ class AccoEngine:
             max_rows=max_rows,
             min_reduction=min_reduction,
         )
+        self._observe_framework(framework, "middleware.database", result, started)
+        return result
 
     def execute(
         self,
@@ -410,10 +488,16 @@ class AccoEngine:
     ) -> dict[str, Any]:
         """Recover exact bytes or one typed-object JSON-Pointer subtree."""
         if handle.startswith("tsr_obj_") or handle.startswith("tsr://"):
+            selected = self.recovery.select(handle, pointer)
+            metadata = selected.get("metadata")
+            tool_key = metadata.get("tool_key") if isinstance(metadata, dict) else None
+            selected_pointer = selected.get("pointer")
+            if isinstance(tool_key, str) and isinstance(selected_pointer, str):
+                record_field_retrieval(self.root, tool_key, selected_pointer)
             return {
                 "schema": 1,
                 "kind": "object",
-                **self.recovery.select(handle, pointer),
+                **selected,
             }
         record = self.recovery.get(handle)
         try:
@@ -436,6 +520,29 @@ class AccoEngine:
             "last_accessed_at": record.last_accessed_at,
             "access_count": record.access_count,
         }
+
+    def tool_field_learning(self, *, limit: int = 50) -> dict[str, Any]:
+        """Report local learned structured-field importance without field values."""
+        return field_learning_report(self.root, limit=limit)
+
+    def cache_ttl_learning(self) -> dict[str, Any]:
+        """Report provider-observed cache TTL bounds and qualified estimates."""
+        return cache_ttl_report(self.root)
+
+    def output_holdout(self, *, bootstrap_samples: int = 1000) -> dict[str, Any]:
+        """Report measured provider output-token holdout evidence."""
+        return output_holdout_report(
+            self.root,
+            bootstrap_samples=bootstrap_samples,
+        )
+
+    def observability(self, *, days: int = 7) -> dict[str, Any]:
+        """Return provider/framework operational metrics for this project."""
+        return observability_report(self.root, days=days)
+
+    def prometheus(self, *, days: int = 7) -> str:
+        """Return Prometheus text exposition for local ACCO runtime metrics."""
+        return prometheus_metrics(self.root, days=days)
 
     def middleware(self, provider: str) -> AccoMiddleware:
         """Create a provider-bound middleware facade for a custom agent."""

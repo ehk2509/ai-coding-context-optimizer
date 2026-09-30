@@ -97,6 +97,10 @@ For machine-readable fields, see [Machine-readable CLI contracts](JSON_OUTPUTS.m
 - [`context-audit`](commands/context-audit.md) — audit cross-host always-on instructions, skills, duplicates, and MCP context.
 - [`statusline`](commands/statusline.md) — render one fast live efficiency line.
 - [`cache-economics`](commands/cache-economics.md) — compare context rewrites after prompt-cache costs.
+- [`cache-ttl`](commands/cache-ttl.md) — inspect provider-observed cache TTL bounds and qualified learned estimates.
+- [`tool-fields`](commands/tool-fields.md) — inspect local structured tool-field retrieval importance without field values.
+- [`output-holdout`](commands/output-holdout.md) — report measured eligible control/treatment output-token evidence.
+- [`observability`](commands/observability.md) — inspect provider/framework latency, transform, token, cache, and holdout metrics.
 - [`budget`](commands/budget.md) — compare measured context with budget guidance.
 - [`context-budget`](commands/context-budget.md) — allocate one total model-context envelope across source, history, memory, tool results, schemas, and reserve.
 - [`policy`](commands/policy.md) — generate lifecycle advice from transcripts.

@@ -10,10 +10,16 @@ import ipaddress
 import json
 from pathlib import Path
 import sys
+import time
 from urllib.error import HTTPError
 from urllib.parse import urljoin, urlparse, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
+from .observability import (
+    observability_report,
+    prometheus_metrics,
+    record_provider_request,
+)
 from .provider_boundary import SUPPORTED_PROVIDERS
 from .provider_cost import PROVIDER_MODEL_ROUTING_MODES
 from .provider_transform import ProviderTransformResult, transform_provider_request
@@ -56,6 +62,10 @@ class ProviderProxyConfig:
     context_budget_total_tokens: int | None = None
     provider_cache_mode: str = "plan"
     provider_cache_expected_reuses: int = 2
+    output_holdout_enabled: bool = False
+    output_holdout_control_rate: float = 0.10
+    output_holdout_mode: str = "normal"
+    output_holdout_calibration_file: str = ".acco.output-calibration.json"
 
     def validate(self) -> ProviderProxyConfig:
         """Reject unsafe binding/upstream combinations before serving."""
@@ -109,6 +119,10 @@ class ProviderProxyConfig:
             or int(self.provider_cache_expected_reuses) < 0
         ):
             raise ValueError("provider_cache_expected_reuses must be nonnegative")
+        if not 0 < float(self.output_holdout_control_rate) < 1:
+            raise ValueError("output_holdout_control_rate must be between 0 and 1")
+        if self.output_holdout_mode not in {"terse", "normal", "detailed"}:
+            raise ValueError("output_holdout_mode must be terse, normal, or detailed")
         return self
 
 
@@ -167,6 +181,10 @@ def transform_request_bytes(
         context_budget_total_tokens=config.context_budget_total_tokens,
         provider_cache_mode=config.provider_cache_mode,
         provider_cache_expected_reuses=config.provider_cache_expected_reuses,
+        output_holdout_enabled=config.output_holdout_enabled,
+        output_holdout_control_rate=config.output_holdout_control_rate,
+        output_holdout_mode=config.output_holdout_mode,
+        output_holdout_calibration_file=config.output_holdout_calibration_file,
     )
     encoded = (
         json.dumps(
@@ -177,7 +195,11 @@ def transform_request_bytes(
         if result.changed
         else raw
     )
-    return TransformedRequest(encoded, result.metadata())
+    metadata = result.metadata()
+    model = result.body.get("model")
+    if isinstance(model, str):
+        metadata["request_model"] = model[:160]
+    return TransformedRequest(encoded, metadata)
 
 
 def _upstream_url(base: str, path: str) -> str:
@@ -248,6 +270,28 @@ def _handler_factory(
             if self.command == "GET" and self.path == "/__acco/health":
                 self._health()
                 return
+            if self.command == "GET" and self.path == "/__acco/stats":
+                payload = json.dumps(
+                    observability_report(config.root),
+                    separators=(",", ":"),
+                ).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+                return
+            if self.command == "GET" and self.path == "/__acco/metrics":
+                payload = prometheus_metrics(config.root).encode()
+                self.send_response(200)
+                self.send_header(
+                    "Content-Type",
+                    "text/plain; version=0.0.4; charset=utf-8",
+                )
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+                return
             self._proxy()
 
         def _proxy(self) -> None:
@@ -287,11 +331,43 @@ def _handler_factory(
                 headers=headers,
                 method=self.command,
             )
+            started = time.perf_counter()
             try:
                 response = opener(request, timeout=config.timeout_seconds)
             except HTTPError as exc:
                 response = exc
             except OSError as exc:
+                meta = transformed.metadata
+                request_meta = meta.get("request", {})
+                provider = (
+                    str(request_meta.get("provider") or config.provider)
+                    if isinstance(request_meta, dict)
+                    else config.provider
+                )
+                shape = (
+                    str(request_meta.get("shape") or "unknown")
+                    if isinstance(request_meta, dict)
+                    else "unknown"
+                )
+                try:
+                    record_provider_request(
+                        config.root,
+                        provider=provider,
+                        shape=shape,
+                        model=(
+                            str(meta.get("request_model"))
+                            if meta.get("request_model")
+                            else None
+                        ),
+                        status=502,
+                        latency_ms=(time.perf_counter() - started) * 1000.0,
+                        changed=bool(meta.get("changed")),
+                        original_tokens=int(meta.get("original_tokens", 0) or 0),
+                        output_tokens=int(meta.get("output_tokens", 0) or 0),
+                        recovery_handles=len(meta.get("recovery_handles", [])),
+                    )
+                except (OSError, ValueError):
+                    pass
                 self.send_error(502, f"upstream unavailable: {exc}")
                 return
 
@@ -326,6 +402,21 @@ def _handler_factory(
                     request_shape=request_shape,
                     streaming=streaming,
                     content_type=response.headers.get("Content-Type", ""),
+                    cache_context=(
+                        transformed.metadata.get("prefix")
+                        if isinstance(transformed.metadata.get("prefix"), dict)
+                        else None
+                    ),
+                    request_model=(
+                        str(transformed.metadata.get("request_model"))
+                        if transformed.metadata.get("request_model")
+                        else None
+                    ),
+                    output_holdout=(
+                        transformed.metadata.get("output_holdout")
+                        if isinstance(transformed.metadata.get("output_holdout"), dict)
+                        else None
+                    ),
                 )
                 if config.usage_telemetry
                 else None
@@ -349,6 +440,25 @@ def _handler_factory(
                     )
 
             meta = transformed.metadata
+            try:
+                record_provider_request(
+                    config.root,
+                    provider=provider,
+                    shape=request_shape,
+                    model=(
+                        str(meta.get("request_model"))
+                        if meta.get("request_model")
+                        else None
+                    ),
+                    status=int(response.status),
+                    latency_ms=(time.perf_counter() - started) * 1000.0,
+                    changed=bool(meta.get("changed")),
+                    original_tokens=int(meta.get("original_tokens", 0) or 0),
+                    output_tokens=int(meta.get("output_tokens", 0) or 0),
+                    recovery_handles=len(meta.get("recovery_handles", [])),
+                )
+            except (OSError, ValueError):
+                pass
             if meta.get("changed"):
                 routing = meta.get("model_routing") or {}
                 route_text = (

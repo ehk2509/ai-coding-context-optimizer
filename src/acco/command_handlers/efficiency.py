@@ -8,11 +8,15 @@ from pathlib import Path
 import sys
 
 from ..cache_economics import assess_context_rewrite
+from ..cache_ttl import cache_ttl_report
 from ..efficiency import continuity_report, dashboard_report
 from ..estimate import Counter, DEFAULT_MODEL
 from ..efficiency.advisor import advisor_report
 from ..unified_audit import unified_audit_report
 from ..efficiency.dashboard import render_dashboard_html
+from ..observability import observability_report, prometheus_metrics
+from ..output_holdout import output_holdout_report
+from ..tool_field_learning import field_learning_report
 
 
 def _tokens(value: object) -> str:
@@ -382,6 +386,140 @@ def cost_advisor_main(argv: list[str]) -> int:
     )
     return 0
 
+
+
+def tool_fields_main(argv: list[str]) -> int:
+    """Show locally learned structured tool-field importance."""
+    parser = argparse.ArgumentParser(prog="acco tool-fields")
+    parser.add_argument("path", nargs="?", default=".")
+    parser.add_argument("--limit", type=int, default=50)
+    parser.add_argument("--json", action="store_true")
+    args = parser.parse_args(argv)
+    try:
+        report = field_learning_report(Path(args.path), limit=args.limit)
+    except (OSError, ValueError) as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    if args.json:
+        print(json.dumps(report, indent=2))
+        return 0
+    print("ACCO TOOL-FIELD LEARNING")
+    print(f"tools observed: {report['tools']}")
+    if not report["fields"]:
+        print("no retrieval-qualified field evidence")
+    for item in report["fields"]:
+        print(
+            f"{item['tool']}: {item['field_path']} "
+            f"retrieved={item['retrievals']}/{item['exposures']} "
+            f"confidence={item['confidence']:.0%}"
+        )
+    print("privacy: structural field paths/counters only; no field values stored")
+    return 0
+
+
+def cache_ttl_main(argv: list[str]) -> int:
+    """Show cache-TTL bounds learned from provider-observed cache counters."""
+    parser = argparse.ArgumentParser(prog="acco cache-ttl")
+    parser.add_argument("path", nargs="?", default=".")
+    parser.add_argument("--json", action="store_true")
+    args = parser.parse_args(argv)
+    report = cache_ttl_report(Path(args.path))
+    if args.json:
+        print(json.dumps(report, indent=2))
+        return 0
+    print("ACCO CACHE TTL")
+    if not report["estimates"]:
+        print("no provider cache observations")
+    for item in report["estimates"]:
+        learned = item["learned_ttl_seconds"]
+        learned_text = f"{learned}s" if isinstance(learned, int) else "unqualified"
+        print(
+            f"{item['provider']}/{item['model']}: "
+            f"hits={item['hits']} misses={item['misses']} "
+            f"lower={item['hit_lower_bound_seconds']} "
+            f"upper={item['expiry_upper_bound_seconds']} "
+            f"ttl={learned_text}"
+        )
+    print(
+        "evidence: cache counters are provider-observed; ttl_expiry is inferred "
+        "only when an exact reused prefix stops producing cache-read tokens"
+    )
+    return 0
+
+
+def output_holdout_main(argv: list[str]) -> int:
+    """Report randomized provider-observed output-token holdout evidence."""
+    parser = argparse.ArgumentParser(prog="acco output-holdout")
+    parser.add_argument("path", nargs="?", default=".")
+    parser.add_argument("--bootstrap-samples", type=int, default=1000)
+    parser.add_argument("--json", action="store_true")
+    args = parser.parse_args(argv)
+    try:
+        report = output_holdout_report(
+            Path(args.path),
+            bootstrap_samples=args.bootstrap_samples,
+        )
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    if args.json:
+        print(json.dumps(report, indent=2))
+        return 0
+    print("ACCO OUTPUT HOLDOUT")
+    reduction = report["measured_output_token_reduction"]
+    if reduction is None:
+        print("measured reduction: insufficient matched control/treatment evidence")
+    else:
+        print(f"measured reduction: {reduction:.1%}")
+    ci = report["ci95"]
+    if isinstance(ci, list) and len(ci) == 2:
+        print(f"95% bootstrap CI: {ci[0]:.1%} .. {ci[1]:.1%}")
+    print(f"matched epoch weight: {report['matched_epoch_weight']}")
+    print(
+        "boundary: randomized output-token evidence only; response quality and "
+        "cost-per-success still require paired evaluation"
+    )
+    return 0
+
+
+def observability_main(argv: list[str]) -> int:
+    """Show local provider/framework operational metrics or Prometheus text."""
+    parser = argparse.ArgumentParser(prog="acco observability")
+    parser.add_argument("path", nargs="?", default=".")
+    parser.add_argument("--days", type=int, default=7)
+    parser.add_argument("--prometheus", action="store_true")
+    parser.add_argument("--json", action="store_true")
+    args = parser.parse_args(argv)
+    root = Path(args.path)
+    try:
+        if args.prometheus:
+            sys.stdout.write(prometheus_metrics(root, days=args.days))
+            return 0
+        report = observability_report(root, days=args.days)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    if args.json:
+        print(json.dumps(report, indent=2))
+        return 0
+    print(f"ACCO OBSERVABILITY — {report['window_days']} days")
+    if not report["providers"]:
+        print("provider boundary: no observations")
+    for provider, item in report["providers"].items():
+        p95 = item["latency_ms_p95"]
+        p95_text = f"{p95:.1f}ms" if isinstance(p95, (int, float)) else "n/a"
+        print(
+            f"provider {provider}: calls={item['calls']} "
+            f"transformed={item['transformed']} p95={p95_text} "
+            f"context_removed~{item['estimated_context_tokens_removed']}"
+        )
+    for key, item in report["frameworks"].items():
+        print(
+            f"framework {key}: calls={item['calls']} failures={item['failures']} "
+            f"context_removed~{item['estimated_context_tokens_removed']}"
+        )
+    print(report["evidence"])
+    return 0
 
 
 def continuity_main(argv: list[str]) -> int:

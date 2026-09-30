@@ -1,5 +1,23 @@
 # Unreleased
 
+- **Added local learned tool-field importance.** Structured JSON tool outputs can
+  learn from selective recovery: ACCO persists only bounded tool identities,
+  structural field paths, exposure counts, and retrieval counts, then uses
+  qualified hints to preserve repeatedly requested fields during recoverable
+  JSON compaction.
+- **Added provider-observed cache-TTL learning.** Cache lifetime bounds are
+  inferred only from explicit provider cache counters and stable-prefix evidence;
+  missing counters are not treated as misses. Qualified estimates require
+  repeated hits plus an exact-prefix post-hit miss.
+- **Added measured output-shaping holdouts.** The provider boundary can opt into
+  deterministic conversation-level control/treatment assignment and measure
+  provider-reported output-token deltas for eligible requests. The holdout
+  remains explicitly separate from response-quality and cost-per-success claims.
+- **Added provider/framework observability.** Provider proxy traffic and SDK
+  framework operations emit content-free latency/token metadata, expose local
+  JSON and Prometheus views, and are available through Python/TypeScript report
+  APIs and dedicated CLI diagnostics.
+
 - **Hardened exact recovery into Recovery Store v2.** Existing byte-exact
   `tsr_...` records migrate in place and now carry verified full digests,
   access metadata, dependency edges and integrity checks. Typed canonical-JSON

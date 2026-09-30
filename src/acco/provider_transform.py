@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from .context_budget import ContextBudgetPlan, plan_context_budget
+from .cache_ttl import learned_ttl_seconds
 from .context_router import route_context
 from .efficiency.store import append_event
 from .estimate import estimate_tokens
@@ -24,6 +25,7 @@ from .provider_cache import (
     plan_provider_cache,
     record_cache_plan,
 )
+from .output_holdout import apply_output_holdout, holdout_epoch_key
 from .provider_cost import (
     PROVIDER_MODEL_ROUTING_MODES,
     apply_calibrated_provider_route,
@@ -58,6 +60,7 @@ class ProviderTransformResult:
     model_routing: dict[str, Any] | None = None
     context_budget: dict[str, Any] | None = None
     cache_plan: dict[str, Any] | None = None
+    output_holdout: dict[str, Any] | None = None
 
     def metadata(self) -> dict:
         """Return request transformation metadata without request content."""
@@ -83,6 +86,7 @@ class ProviderTransformResult:
             },
             "context_budget": self.context_budget,
             "cache_plan": self.cache_plan,
+            "output_holdout": self.output_holdout,
             "policy": "retrieval-first-historical-only",
         }
 
@@ -170,12 +174,52 @@ def _provider_context_budget(
     return plan, segments, schema_tokens
 
 
+def _tool_name_index(body: dict) -> dict[str, str]:
+    """Map provider tool-call ids to bounded stable tool names."""
+    names: dict[str, str] = {}
+    messages = body.get("messages")
+    if isinstance(messages, list):
+        for message in messages:
+            if not isinstance(message, dict):
+                continue
+            content = message.get("content")
+            if isinstance(content, list):
+                for block in content:
+                    if not isinstance(block, dict):
+                        continue
+                    if block.get("type") == "tool_use":
+                        call_id = block.get("id")
+                        name = block.get("name")
+                        if isinstance(call_id, str) and isinstance(name, str):
+                            names[call_id] = name[:96]
+            calls = message.get("tool_calls")
+            if isinstance(calls, list):
+                for call in calls:
+                    if not isinstance(call, dict):
+                        continue
+                    call_id = call.get("id")
+                    function = call.get("function")
+                    name = function.get("name") if isinstance(function, dict) else None
+                    if isinstance(call_id, str) and isinstance(name, str):
+                        names[call_id] = name[:96]
+    input_items = body.get("input")
+    if isinstance(input_items, list):
+        for item in input_items:
+            if not isinstance(item, dict) or item.get("type") != "function_call":
+                continue
+            call_id = item.get("call_id") or item.get("id")
+            name = item.get("name")
+            if isinstance(call_id, str) and isinstance(name, str):
+                names[call_id] = name[:96]
+    return names
+
 def _compress_tool_text(
     text: str,
     *,
     query: str,
     recovery: RecoveryStore,
     min_tokens: int,
+    tool_key: str = "provider-tool-result",
 ) -> tuple[str, str | None]:
     """Route one large historical tool-result string through exact recovery."""
     if estimate_tokens(text) < min_tokens:
@@ -187,6 +231,7 @@ def _compress_tool_text(
         command="provider-tool-result",
         max_lines=100,
         min_reduction=0.08,
+        tool_key=tool_key,
     )
     return (
         result.text,
@@ -201,6 +246,7 @@ def _transform_content_blocks(
     recovery: RecoveryStore,
     min_tokens: int,
     handles: list[str],
+    tool_names: dict[str, str],
 ) -> tuple[list, int]:
     """Transform Anthropic-style historical tool-result content blocks."""
     out = []
@@ -210,6 +256,12 @@ def _transform_content_blocks(
             out.append(block)
             continue
         updated = dict(block)
+        tool_id = updated.get("tool_use_id")
+        tool_key = (
+            tool_names.get(tool_id, "anthropic-tool")
+            if isinstance(tool_id, str)
+            else "anthropic-tool"
+        )
         content = updated.get("content")
         if isinstance(content, str):
             transformed, handle = _compress_tool_text(
@@ -217,6 +269,7 @@ def _transform_content_blocks(
                 query=query,
                 recovery=recovery,
                 min_tokens=min_tokens,
+                tool_key=tool_key,
             )
             updated["content"] = transformed
             if handle:
@@ -235,6 +288,7 @@ def _transform_content_blocks(
                         query=query,
                         recovery=recovery,
                         min_tokens=min_tokens,
+                        tool_key=tool_key,
                     )
                     item = dict(item)
                     item["text"] = transformed
@@ -254,6 +308,7 @@ def _transform_messages(
     recovery: RecoveryStore,
     min_tokens: int,
     handles: list[str],
+    tool_names: dict[str, str],
 ) -> int:
     """Transform explicit historical tool outputs deterministically."""
     messages = transformed.get("messages")
@@ -274,14 +329,22 @@ def _transform_messages(
                 recovery=recovery,
                 min_tokens=min_tokens,
                 handles=handles,
+                tool_names=tool_names,
             )
             changed += count
         if updated.get("role") == "tool" and isinstance(content, str):
+            tool_id = updated.get("tool_call_id")
+            tool_key = (
+                tool_names.get(tool_id, str(updated.get("name") or "openai-tool"))
+                if isinstance(tool_id, str)
+                else str(updated.get("name") or "openai-tool")
+            )
             updated["content"], handle = _compress_tool_text(
                 content,
                 query=query,
                 recovery=recovery,
                 min_tokens=min_tokens,
+                tool_key=tool_key,
             )
             if handle:
                 handles.append(handle)
@@ -298,6 +361,7 @@ def _transform_openai_input(
     recovery: RecoveryStore,
     min_tokens: int,
     handles: list[str],
+    tool_names: dict[str, str],
 ) -> int:
     """Transform OpenAI Responses historical tool outputs deterministically."""
     input_items = transformed.get("input")
@@ -312,11 +376,18 @@ def _transform_openai_input(
             and isinstance(item.get("output"), str)
         ):
             item = dict(item)
+            call_id = item.get("call_id") or item.get("tool_call_id")
+            tool_key = (
+                tool_names.get(call_id, "openai-response-tool")
+                if isinstance(call_id, str)
+                else "openai-response-tool"
+            )
             item["output"], handle = _compress_tool_text(
                 item["output"],
                 query=query,
                 recovery=recovery,
                 min_tokens=min_tokens,
+                tool_key=tool_key,
             )
             if handle:
                 handles.append(handle)
@@ -344,6 +415,7 @@ def _transform_gemini(
                 query=query,
                 recovery=recovery,
                 min_tokens=min_tokens,
+                tool_key=str(parent.get("name") or "gemini-function"),
             )
             parent[key] = candidate
             if handle:
@@ -359,6 +431,7 @@ def _transform_gemini(
                 query=query,
                 recovery=recovery,
                 min_tokens=min_tokens,
+                tool_key=str(parent.get("name") or "gemini-function"),
             )
             leaf_parent[leaf_key] = candidate
             if handle:
@@ -386,6 +459,10 @@ def transform_provider_request(
     context_budget_total_tokens: int | None = None,
     provider_cache_mode: str = "plan",
     provider_cache_expected_reuses: int = 2,
+    output_holdout_enabled: bool = False,
+    output_holdout_control_rate: float = 0.10,
+    output_holdout_mode: str = "normal",
+    output_holdout_calibration_file: str = ".acco.output-calibration.json",
 ) -> ProviderTransformResult:
     """Optimize historical provider context while leaving current task/source intact."""
     if not isinstance(body, dict):
@@ -394,6 +471,7 @@ def transform_provider_request(
     original_tokens = _json_tokens(body)
     transformed = deepcopy(body)
     recovery = RecoveryStore(root, capacity_bytes=recovery_capacity_bytes)
+    tool_names = _tool_name_index(body)
     handles: list[str] = []
     schema_handle = None
     transformed_segments = 0
@@ -484,6 +562,7 @@ def transform_provider_request(
                 recovery=recovery,
                 min_tokens=effective_tool_result_min_tokens,
                 handles=handles,
+                tool_names=tool_names,
             )
             transformed_segments += _transform_openai_input(
                 transformed,
@@ -491,6 +570,7 @@ def transform_provider_request(
                 recovery=recovery,
                 min_tokens=effective_tool_result_min_tokens,
                 handles=handles,
+                tool_names=tool_names,
             )
             if profile.provider == "gemini":
                 transformed_segments += _transform_gemini(
@@ -546,6 +626,11 @@ def transform_provider_request(
         record_cache_plan(root, cache_plan)
         cache_metadata = cache_plan.to_dict()
         cache_metadata["mode"] = cache_mode
+        cache_metadata["learned_ttl_seconds"] = learned_ttl_seconds(
+            root,
+            profile.provider,
+            str(transformed.get("model")) if transformed.get("model") else None,
+        )
         if cache_mode == "apply":
             transformed, cache_applied, apply_reason = apply_provider_cache_plan(
                 transformed,
@@ -557,11 +642,29 @@ def transform_provider_request(
             cache_metadata["applied"] = False
             cache_metadata["apply_reason"] = "plan_only"
 
+    output_holdout = apply_output_holdout(
+        root,
+        transformed,
+        profile,
+        prompt=latest_user_text(transformed, profile),
+        epoch_key=holdout_epoch_key(body, profile),
+        enabled=bool(output_holdout_enabled),
+        control_rate=float(output_holdout_control_rate),
+        mode=output_holdout_mode,
+        calibration_file=output_holdout_calibration_file,
+    )
+    output_holdout_metadata = output_holdout.to_dict()
+
     output_tokens = _json_tokens(transformed)
     routing_applied = bool(routing_metadata.get("applied"))
     changed = (
         transformed != body
-        and (output_tokens < original_tokens or routing_applied or cache_applied)
+        and (
+            output_tokens < original_tokens
+            or routing_applied
+            or cache_applied
+            or output_holdout.applied
+        )
     )
     if not changed:
         transformed = deepcopy(body)
@@ -622,4 +725,5 @@ def transform_provider_request(
         model_routing=routing_metadata,
         context_budget=context_plan.to_dict() if context_plan is not None else None,
         cache_plan=cache_metadata,
+        output_holdout=output_holdout_metadata,
     )

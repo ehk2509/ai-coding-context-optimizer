@@ -457,3 +457,64 @@ test("typed client exposes execute-file batch and session-ledger APIs", async ()
     ["/v1/execute-file", "/v1/batch-execute", "/v1/session/search"],
   );
 });
+
+
+test("typed client exposes learned runtime reports", async () => {
+  const paths = [];
+  await withServer(async (req, res) => {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    const body = chunks.length
+      ? JSON.parse(Buffer.concat(chunks).toString("utf8"))
+      : {};
+    paths.push(req.url);
+    res.writeHead(200, { "content-type": "application/json" });
+    if (req.url === "/v1/observability") {
+      assert.equal(body.days, 14);
+      res.end(JSON.stringify({
+        schema: 1,
+        window_days: 14,
+        providers: {},
+        frameworks: {},
+        cache_ttl: {},
+        output_holdout: {},
+        evidence: "local",
+      }));
+    } else if (req.url === "/v1/cache-ttl") {
+      res.end(JSON.stringify({ schema: 1, estimates: [], policy: "observed" }));
+    } else if (req.url === "/v1/output-holdout") {
+      assert.equal(body.bootstrap_samples, 200);
+      res.end(JSON.stringify({
+        schema: 1,
+        experiment: "output-holdout-v1",
+        matched_epoch_weight: 0,
+        measured_output_token_reduction: null,
+        ci95: null,
+        strata: [],
+        claim_boundary: "quality not established",
+      }));
+    } else {
+      assert.equal(req.url, "/v1/tool-fields");
+      assert.equal(body.limit, 10);
+      res.end(JSON.stringify({
+        schema: 1,
+        tools: 0,
+        fields: [],
+        privacy: "paths and counters only",
+      }));
+    }
+  }, async (baseUrl) => {
+    const client = new AccoClient({ baseUrl });
+    assert.equal((await client.observability(14)).window_days, 14);
+    assert.deepEqual((await client.cacheTtl()).estimates, []);
+    assert.equal((await client.outputHoldout(200)).matched_epoch_weight, 0);
+    assert.equal((await client.toolFields(10)).tools, 0);
+  });
+
+  assert.deepEqual(paths, [
+    "/v1/observability",
+    "/v1/cache-ttl",
+    "/v1/output-holdout",
+    "/v1/tool-fields",
+  ]);
+});

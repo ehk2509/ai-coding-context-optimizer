@@ -18,6 +18,7 @@ from ..model_routing import (
 from ..patch_context import build_diff_context, review_patch
 from ..prefix_cache import prefix_status
 from ..recovery import RecoveryStore
+from ..tool_field_learning import record_field_retrieval
 from .contracts import McpToolContext, McpToolSpec
 from .tool_surface import ADAPTIVE_CORE, adaptive_surface_description, adaptive_tool_names
 
@@ -259,6 +260,11 @@ def _recover_context(context: McpToolContext, arguments: dict) -> dict:
             reference,
             str(pointer) if isinstance(pointer, str) else None,
         )
+        metadata = selected.get("metadata")
+        tool_key = metadata.get("tool_key") if isinstance(metadata, dict) else None
+        selected_pointer = selected.get("pointer")
+        if isinstance(tool_key, str) and isinstance(selected_pointer, str):
+            record_field_retrieval(context.root, tool_key, selected_pointer)
         return {"kind": "object", **selected}
     record = store.get(reference)
     try:

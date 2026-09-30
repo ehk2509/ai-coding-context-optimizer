@@ -165,6 +165,24 @@ export class AccoClient {
     return this.request("POST", "/v1/recover", { handle });
   }
 
+  observability(days = 7) {
+    return this.request("POST", "/v1/observability", { days });
+  }
+
+  cacheTtl() {
+    return this.request("POST", "/v1/cache-ttl", {});
+  }
+
+  outputHoldout(bootstrapSamples = 1000) {
+    return this.request("POST", "/v1/output-holdout", {
+      bootstrap_samples: bootstrapSamples,
+    });
+  }
+
+  toolFields(limit = 50) {
+    return this.request("POST", "/v1/tool-fields", { limit });
+  }
+
   interceptFetch(provider, options = {}) {
     if (!provider.trim()) throw new TypeError("provider must be nonempty");
     const upstream = options.fetchImpl ?? fetch;
