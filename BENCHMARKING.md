@@ -248,6 +248,11 @@ establish lower API cost, coding-task success, or cost per successful task.
 > blind output-quality grading was not run. See
 > [`benchmarks/e2e-swebench-24-subscription.frozen.result.md`](benchmarks/e2e-swebench-24-subscription.frozen.result.md); the earlier unfrozen
 > [development study](benchmarks/e2e-subscription-swebench-24-2026-09-27.md) is superseded.
+>
+> **Fresh 1.24 run (headline withheld):** on 24 unseen tasks frozen before any
+> run, ACCO 1.24.0 cut equivalent cost by 19.5% (95% CI 5.4–31.1%) but solved
+> 52/72 vs 55/72, so the gate withholds the cost-per-success figure. See
+> [`benchmarks/e2e-swebench-24-1.24-fresh.frozen.result.md`](benchmarks/e2e-swebench-24-1.24-fresh.frozen.result.md).
 
 For evidence that supports a public cost claim, use the executable experiment
 harness rather than hand-assembling a few runs. It exports history-isolated snapshots at pinned revisions, randomizes
