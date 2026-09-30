@@ -1,3 +1,5 @@
+import pytest
+
 from acco.output_processors import (
     ProcessorRegistry,
     explain_processor,
@@ -120,6 +122,25 @@ def test_search_processor_keeps_bounded_unique_hits():
     assert result.compressed is True
     assert "src/file_0.py:10:match" in result.text
     assert "omitted" in result.text
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        'grep -n "_get_aligned_offsets\\|class HPacker" -A 40 lib/offsetbox.py | head -200',
+        "grep -rnA5 needle src",
+        "rg -C3 needle src",
+        "rg --context 3 needle src",
+        "grep --after-context=4 needle src/app.py",
+    ],
+)
+def test_search_processor_keeps_context_searches_whole(command):
+    """-A/-B/-C output is code the agent asked to read; never cap it to hits."""
+    text = "\n".join(f"{130 + index}-    body line {index}" for index in range(143))
+    result = process_output(text, command, exit_code=0, min_reduction=0.0)
+    assert result.processor == "search"
+    assert result.compressed is False
+    assert result.text.rstrip("\n") == text
 
 
 def test_lint_processor_preserves_failure_locations():

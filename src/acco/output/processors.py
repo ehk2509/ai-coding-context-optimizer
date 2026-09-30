@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import shlex
 
 from .payload_processors import payload_processors
 from .specialized_processors import extended_processors
@@ -14,6 +15,34 @@ _GIT_LOG = re.compile(r"\bgit\s+log\b", re.I)
 _NPM_INSTALL = re.compile(r"\b(npm|pnpm|yarn|bun|pip|pip3|uv)\s+(i|install|ci|sync)\b", re.I)
 _GIT_STATUS = re.compile(r"\bgit\s+status\b", re.I)
 _SEARCH = re.compile(r"(^|[;&|]\s*|\b)(rg|grep|find)\b", re.I)
+# grep/rg flags that request surrounding lines (-A/-B/-C N, --context...).
+_CONTEXT_FLAG = re.compile(
+    r"^(?:-[a-zA-Z]*[ABC](?:=?\d+)?|--(?:after-|before-)?context(?:=\d+)?)$"
+)
+
+
+def _is_context_search(command: str) -> bool:
+    """Return whether a grep/rg invocation asks for context around each hit.
+
+    Such output is code the agent chose to read, not a list of hits.
+    """
+    try:
+        lexer = shlex.shlex(command, posix=True, punctuation_chars="|;&")
+        lexer.whitespace_split = True
+        tokens = list(lexer)
+    except ValueError:
+        return False
+    searching = False
+    for token in tokens:
+        if token and set(token) <= set("|;&"):
+            searching = False
+        elif token.rsplit("/", 1)[-1] in {"grep", "egrep", "rg"}:
+            searching = True
+        elif searching and _CONTEXT_FLAG.match(token):
+            return True
+    return False
+
+
 _LINT = re.compile(r"\b(ruff|eslint|pylint|clippy)\b", re.I)
 _TYPECHECK = re.compile(r"\b(tsc|mypy|pyright)\b", re.I)
 _COMPILED_TEST = re.compile(r"\b(go\s+test|cargo\s+test|dotnet\s+test)\b", re.I)
@@ -430,8 +459,14 @@ class SearchProcessor:
         max_lines: int,
         keep_tail: int,
     ) -> str:
-        """Keep first unique result lines plus an omitted-result count."""
-        del command, failed, keep_tail
+        """Keep first unique result lines plus an omitted-result count.
+
+        Context searches pass through unchanged: capping them drops the code
+        the agent explicitly asked to read.
+        """
+        del failed, keep_tail
+        if _is_context_search(command):
+            return text
         lines = preprocess(text).splitlines()
         unique: list[str] = []
         seen: set[str] = set()
