@@ -150,14 +150,19 @@ def main() -> int:
     parser.add_argument("--commit", default=DEFAULT_COMMIT)
     parser.add_argument(
         "--agent-image",
-        default=f"acco-e2e-agent:2.1.276-acco-{DEFAULT_COMMIT[:7]}",
+        default=None,
+        help="override the ACCO agent image; defaults to the selected --commit",
     )
     parser.add_argument("--seed", type=int, default=20260930)
     args = parser.parse_args()
 
     suite = deepcopy(_load(args.source))
     reference = _load(args.reference)
-    _normalize_runner(suite, commit=args.commit, image=args.agent_image)
+    agent_image = (
+        args.agent_image
+        or f"acco-e2e-agent:2.1.276-acco-{str(args.commit)[:7]}"
+    )
+    _normalize_runner(suite, commit=args.commit, image=agent_image)
 
     if args.mode == "fresh":
         _validate_broad(suite)
