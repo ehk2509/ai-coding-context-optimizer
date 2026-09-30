@@ -51,9 +51,10 @@ def test_merge_rebases_artifact_paths_to_the_merged_manifest(tmp_path):
 def test_merge_keeps_paths_when_written_next_to_shards(tmp_path):
     """Merging into the shard directory leaves paths unchanged."""
     merge = _merge_module()
-    run = {"transcripts": ["a/transcript.jsonl"], "agent_patch": "/abs/agent.patch"}
+    absolute = str(tmp_path / "abs" / "agent.patch")
+    run = {"transcripts": ["a/transcript.jsonl"], "agent_patch": absolute}
 
     rebased = merge._rebase_run(run, tmp_path, tmp_path)
 
     assert rebased["transcripts"] == ["a/transcript.jsonl"]
-    assert rebased["agent_patch"] == "/abs/agent.patch"
+    assert rebased["agent_patch"] == absolute
