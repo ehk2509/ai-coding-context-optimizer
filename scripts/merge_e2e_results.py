@@ -30,7 +30,7 @@ def _rebase(value: str, source: Path, target: Path) -> str:
     """Re-express a path relative to ``source`` as relative to ``target``."""
     if Path(value).is_absolute():
         return value
-    return os.path.relpath(source / value, target)
+    return Path(os.path.relpath(source / value, target)).as_posix()
 
 
 def _rebase_run(run: dict, source: Path, target: Path) -> dict:
