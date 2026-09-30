@@ -128,10 +128,21 @@ def collect_runtime_activation(
 def aggregate_runtime_activation(runs: list[dict[str, Any]]) -> dict[str, Any]:
     """Aggregate per-run runtime evidence without turning availability into efficacy."""
     enabled = [run for run in runs if run.get("condition") == "enabled"]
-    collected = [
+    records = [
         run.get("runtime_activation")
         for run in enabled
         if isinstance(run.get("runtime_activation"), dict)
+    ]
+    collection_errors = [
+        item
+        for item in records
+        if isinstance(item.get("collection_error"), str)
+        and item.get("collection_error")
+    ]
+    collected = [
+        item
+        for item in records
+        if not item.get("collection_error")
     ]
     event_kinds: Counter[str] = Counter()
     tool_calls: Counter[str] = Counter()
@@ -162,8 +173,13 @@ def aggregate_runtime_activation(runs: list[dict[str, Any]]) -> dict[str, Any]:
         "schema": 1,
         "enabled_runs": len(enabled),
         "runs_with_activation_evidence": len(collected),
+        "runs_with_collection_errors": len(collection_errors),
         "runs_with_any_activity": runs_with_any,
-        "coverage_complete": len(enabled) > 0 and len(collected) == len(enabled),
+        "coverage_complete": (
+            len(enabled) > 0
+            and len(collected) == len(enabled)
+            and not collection_errors
+        ),
         "event_kinds": dict(sorted(event_kinds.items())),
         "acco_tool_calls": dict(sorted(tool_calls.items())),
         "surface_runs": dict(sorted(surfaces.items())),
