@@ -1,3 +1,8 @@
+from pathlib import Path
+from types import SimpleNamespace
+
+import acco.runtime_evidence as runtime_evidence
+from acco.efficiency.store import append_event, update_snapshot
 from acco.runtime_evidence import aggregate_runtime_activation
 
 
@@ -53,3 +58,44 @@ def test_aggregate_runtime_activation_exposes_missing_collection():
     assert report["runs_with_activation_evidence"] == 0
     assert report["coverage_complete"] is False
     assert report["surface_runs"] == {}
+
+
+def test_collect_runtime_activation_uses_child_project_identity(tmp_path, monkeypatch):
+    state_root = tmp_path / "state"
+    child_root = Path("/testbed")
+    host_root = tmp_path / "host-worktree"
+    host_root.mkdir()
+    transcript = tmp_path / "transcript.jsonl"
+    transcript.write_text("", encoding="utf-8")
+
+    monkeypatch.setenv("ACCO_STATE_DIR", str(state_root))
+    append_event(
+        child_root,
+        {"kind": "provider_request", "feature": "provider_boundary"},
+    )
+
+    def seed_contract(payload):
+        payload["sessions"] = {
+            "abc": {
+                "contract": {"goal": "fix regression"},
+            }
+        }
+        payload["last_session"] = "abc"
+
+    update_snapshot(child_root, seed_contract)
+    monkeypatch.setattr(
+        runtime_evidence,
+        "analyze",
+        lambda *_args, **_kwargs: SimpleNamespace(calls=[]),
+    )
+
+    report = runtime_evidence.collect_runtime_activation(
+        host_root,
+        transcript,
+        state_root=state_root,
+        state_project_root=child_root,
+    )
+
+    assert report["event_kinds"]["provider_request"] == 1
+    assert report["session_state"]["task_contract_sessions"] == 1
+    assert report["surface_activity"]["task_contract"] is True
