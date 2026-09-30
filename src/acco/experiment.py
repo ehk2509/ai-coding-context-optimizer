@@ -985,6 +985,11 @@ def run_experiment(
                         worktree,
                         transcript,
                         state_root=run_state_dir,
+                        state_project_root=(
+                            Path(str(runner["runtime_state_project_root"]))
+                            if runner.get("runtime_state_project_root")
+                            else None
+                        ),
                     )
                     if instrumented
                     else None
