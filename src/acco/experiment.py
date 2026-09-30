@@ -980,20 +980,30 @@ def run_experiment(
                     if instrumented
                     else None
                 )
-                runtime_activation = (
-                    collect_runtime_activation(
-                        worktree,
-                        transcript,
-                        state_root=run_state_dir,
-                        state_project_root=(
-                            Path(str(runner["runtime_state_project_root"]))
-                            if runner.get("runtime_state_project_root")
-                            else None
-                        ),
-                    )
-                    if instrumented
-                    else None
-                )
+                runtime_activation = None
+                if instrumented:
+                    try:
+                        runtime_activation = collect_runtime_activation(
+                            worktree,
+                            transcript,
+                            state_root=run_state_dir,
+                            state_project_root=(
+                                Path(str(runner["runtime_state_project_root"]))
+                                if runner.get("runtime_state_project_root")
+                                else None
+                            ),
+                        )
+                    except (OSError, RuntimeError, ValueError) as exc:
+                        runtime_activation = {
+                            "schema": 1,
+                            "collection_error": f"{type(exc).__name__}: {exc}",
+                            "any_activity": False,
+                            "claim_boundary": (
+                                "Runtime activation collection failed for this run; "
+                                "the run remains valid for task/cost evidence but "
+                                "cannot support activation coverage claims."
+                            ),
+                        }
 
                 # Remove benchmark instrumentation before capturing the solution.
                 # Hooks, settings, lock files, MCP config and skills written for
