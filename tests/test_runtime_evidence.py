@@ -99,3 +99,23 @@ def test_collect_runtime_activation_uses_child_project_identity(tmp_path, monkey
     assert report["event_kinds"]["provider_request"] == 1
     assert report["session_state"]["task_contract_sessions"] == 1
     assert report["surface_activity"]["task_contract"] is True
+
+
+def test_aggregate_runtime_activation_rejects_collection_errors_as_coverage():
+    report = aggregate_runtime_activation(
+        [
+            {
+                "condition": "enabled",
+                "runtime_activation": {
+                    "schema": 1,
+                    "collection_error": "RuntimeError: broken evidence store",
+                    "any_activity": False,
+                },
+            }
+        ]
+    )
+
+    assert report["enabled_runs"] == 1
+    assert report["runs_with_activation_evidence"] == 0
+    assert report["runs_with_collection_errors"] == 1
+    assert report["coverage_complete"] is False
